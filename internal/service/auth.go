@@ -69,8 +69,13 @@ func passwordValidate(password string) error {
 	// [] - ровно 1 символ из последовательности
 	// [a-zA-z0-9] - либо a-z, либо A-Z, либо только 0-9 в любой части строки
 	// + - предыдущий символ встречается 1 или больше раз
+	re, _ := regexp.Compile("^[A-Za-z0-9]+$")
 	reLetter, _ := regexp.Compile("[A-Za-z]+")
 	reDigit, _ := regexp.Compile("[0-9]+")
+
+	if !re.MatchString(password) {
+		return errors.New(handler.NotValidSymbols)
+	}
 
 	if !reLetter.MatchString(password) {
 		return errors.New(handler.OnlyLatinSymbol)
@@ -117,14 +122,14 @@ func (a *AuthService) Login(user models.UserInput) (*models.UserJSON, error) {
 	userData, err := a.db.FindUserByUsername(user.Username)
 	if err != nil {
 		fmt.Println(err)
-		return nil, errors.New(handler.InternalServerError)
+		return nil, errors.New(handler.UserNotExists)
 	}
 
 	// Проверяем, что введенный пароль соответствует
 	// хэшу пароля из БД
 	if err := bcrypt.CompareHashAndPassword([]byte(userData.Password), []byte(user.Password)); err != nil {
 		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
-			return nil, errors.New(handler.UserPasswordIncorrect)
+			return nil, errors.New(handler.UserNotExists)
 		}
 		fmt.Println(err)
 		return nil, errors.New(handler.PasswordCheckError)

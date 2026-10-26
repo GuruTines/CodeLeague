@@ -17,12 +17,15 @@ var (
 
 	RegisterUserError = "Ошибка при регистрации пользователя!"
 
+	NoRightsThisAction = "Нет прав для этого действия!"
+
 	// Rooms
 	WriteNotExists  = "Записи не существует!"
 	ShortTitleLen   = "Название должно содержать не меньше 3 символов!"
 	LongTitleLen    = "Название должно содержать не больше 128 символов!"
 	MinRoomCapacity = "Вместимость комнаты не должна быть меньше 1!"
 	MaxRoomCapacity = "Вместимость комнаты не должна быть больше 15!"
+	AddTaskError    = "Ошибка добавления задачи!"
 
 	// Tasks
 	TasksListIsEmpty   = "Список задач пуст!"

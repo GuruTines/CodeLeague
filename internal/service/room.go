@@ -45,7 +45,7 @@ func (rm *RoomService) CreateRoom(userID string, room models.RoomInput) (*models
 
 	intUserID, err := strconv.Atoi(userID)
 	if err != nil {
-		return nil, err
+		return nil, errors.New(handler.InternalServerError)
 	}
 
 	// Вызов метода CreateRoom слоя базы данных
@@ -95,7 +95,7 @@ func (rm *RoomService) SetTaskSuccess(roomUUID string, taskID string) error {
 	intTaskID, err := strconv.Atoi(taskID)
 	if err != nil {
 		fmt.Println(err)
-		return err
+		return errors.New(handler.InternalServerError)
 	}
 
 	if err := rm.db.SetTaskSuccessRoom(roomUUID, intTaskID); err != nil {
@@ -105,3 +105,22 @@ func (rm *RoomService) SetTaskSuccess(roomUUID string, taskID string) error {
 
 	return nil
 }
+
+// func (rm *RoomService) IsAdminInRoom(roomUUID string, userID string) error {
+// 	intUserID, err := strconv.Atoi(userID)
+// 	if err != nil {
+// 		fmt.Println(err)
+// 		return errors.New(handler.InternalServerError)
+// 	}
+
+// 	isAdmin, err := rm.db.IsAdminInRoom(roomUUID, intUserID)
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	if !isAdmin {
+// 		return errors.New(handler.NoRightsThisAction)
+// 	}
+
+// 	return nil
+// }

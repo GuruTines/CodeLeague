@@ -15,12 +15,12 @@ type SessionStorage interface {
 }
 
 type AuthMiddlware struct {
-	AuthStorage SessionStorage
+	authStorage SessionStorage
 }
 
 func NewAuthMiddlware(db SessionStorage) *AuthMiddlware {
 	return &AuthMiddlware{
-		AuthStorage: db,
+		authStorage: db,
 	}
 }
 
@@ -36,9 +36,9 @@ func (a *AuthMiddlware) AuthMiddlwareWrap(next http.Handler) http.Handler {
 		sessionID := cookie.Value
 
 		// Поиск id пользователя в redis
-		userID, err := a.AuthStorage.GetSessionByUUID(sessionID)
+		userID, err := a.authStorage.GetSessionByUUID(sessionID)
 		if err != nil {
-			handler.SendErrResponse(w, handler.Unauthorized, http.StatusUnauthorized)
+			handler.SendErrResponse(w, err.Error(), http.StatusUnauthorized)
 			return
 		}
 

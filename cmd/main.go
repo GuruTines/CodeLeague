@@ -34,7 +34,8 @@ func main() {
 	inMemoryStore := inmemory.NewMemory()
 
 	// MIDDLWARE
-	authMiddlware := middlware.NewAuthMiddlware(inMemoryStore)
+	authMid := middlware.NewAuthMiddlware(inMemoryStore)
+	accessMid := middlware.NewAccessMiddlware(postgresStore)
 
 	// БИЗНЕС-ЛОГИКА ПРИЛОЖЕНИЯ
 	authService := service.NewAuthService(postgresStore)       // Авторизация
@@ -49,10 +50,10 @@ func main() {
 	http.HandleFunc("POST /login", authAPI.LoginHandler)       // Вход
 	http.HandleFunc("DELETE /logout", authAPI.LogoutHandler)   // Выход
 
-	http.Handle("POST /rooms", authMiddlware.AuthMiddlwareWrap(http.HandlerFunc(roomAPI.CreateRoomHandler)))                            // Создание комнаты
-	http.Handle("POST /rooms/{UUID}/tasks", authMiddlware.AuthMiddlwareWrap(http.HandlerFunc(roomAPI.AddTasksInRoomHandler)))           // Добавление задач в комнату
-	http.Handle("DELETE /rooms/{UUID}/tasks", authMiddlware.AuthMiddlwareWrap(http.HandlerFunc(roomAPI.DelTasksFromRoomHandler)))       // Удаление задач из комнаты
-	http.Handle("PATCH /rooms/{UUID}/tasks/{taskID}", authMiddlware.AuthMiddlwareWrap(http.HandlerFunc(roomAPI.SetTaskSuccessHandler))) // Обновление статуса is_success задачи внутри комнаты
+	http.Handle("POST /rooms", authMid.AuthMiddlwareWrap(http.HandlerFunc(roomAPI.CreateRoomHandler)))                                                           // Создание задачи
+	http.Handle("POST /rooms/{UUID}/tasks", authMid.AuthMiddlwareWrap(accessMid.AccessMiddlwareWrap(http.HandlerFunc(roomAPI.AddTasksInRoomHandler))))           // Добавление задач в комнату
+	http.Handle("DELETE /rooms/{UUID}/tasks", authMid.AuthMiddlwareWrap(accessMid.AccessMiddlwareWrap(http.HandlerFunc(roomAPI.DelTasksFromRoomHandler))))       // Удаление задач из комнаты
+	http.Handle("PATCH /rooms/{UUID}/tasks/{taskID}", authMid.AuthMiddlwareWrap(accessMid.AccessMiddlwareWrap(http.HandlerFunc(roomAPI.SetTaskSuccessHandler)))) // Обновление статуса is_success задачи внутри комнаты
 
 	if err := http.ListenAndServe(":9091", nil); err != nil {
 		fmt.Println("Возникла ошибка!", err)
@@ -60,5 +61,4 @@ func main() {
 	}
 }
 
-// POSTGRES
-// Зачем нужен context? (Еще и в Hanlers)
+// 1) Обработать ошибки

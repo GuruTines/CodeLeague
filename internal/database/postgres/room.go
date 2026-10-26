@@ -162,3 +162,24 @@ func (p *PostgresStore) SetTaskSuccessRoom(roomUUID string, taskID int) error {
 
 	return nil
 }
+
+func (p *PostgresStore) IsAdminInRoom(roomUUID string, userID string) (bool, error) {
+	var isAdmin bool
+	var pgErr *pgconn.PgError
+
+	query := `SELECT is_admin FROM users_rooms
+	WHERE room_id = $1 AND user_id = $2;`
+
+	if err := p.Pool.QueryRow(context.Background(), query, roomUUID, userID).Scan(&isAdmin); err != nil {
+		fmt.Println(err)
+		if errors.As(err, &pgErr) {
+			if pgErr.Code == "23503" {
+				return false, errors.New(handler.WriteNotExists)
+			}
+			return false, errors.New("Необработанная ошибка pgErr")
+		}
+		return false, errors.New(handler.AddTaskError)
+	}
+
+	return isAdmin, nil
+}

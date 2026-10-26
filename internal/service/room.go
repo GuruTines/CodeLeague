@@ -84,7 +84,8 @@ func (rm *RoomService) DelTasksFromRoom(roomUUID string, tasksList models.TasksL
 
 	err := rm.db.DelTasksFromRoom(roomUUID, tasksList)
 	if err != nil {
-		return nil
+		fmt.Println(err)
+		return err
 	}
 
 	return nil

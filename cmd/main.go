@@ -6,6 +6,7 @@ import (
 	"project/internal/api"
 	"project/internal/database/inmemory"
 	"project/internal/database/postgres"
+	"project/internal/middlware"
 	"project/internal/service"
 )
 
@@ -32,6 +33,9 @@ func main() {
 	// }
 	inMemoryStore := inmemory.NewMemory()
 
+	// MIDDLWARE
+	authMiddlware := middlware.NewAuthMiddlware(inMemoryStore)
+
 	// БИЗНЕС-ЛОГИКА ПРИЛОЖЕНИЯ
 	authService := service.NewAuthService(postgresStore)       // Авторизация
 	sessionService := service.NewSessionService(inMemoryStore) // Сессии
@@ -39,16 +43,16 @@ func main() {
 
 	// ТРАНСПОРТНЫЙ СЛОЙ ПРИЛОЖЕНИЯ
 	authAPI := api.NewAuthAPI(authService, sessionService)
-	roomAPI := api.NewRoomAPI(roomService, inMemoryStore)
+	roomAPI := api.NewRoomAPI(roomService)
 
 	http.HandleFunc("POST /register", authAPI.RegisterHandler) // Регистрация
 	http.HandleFunc("POST /login", authAPI.LoginHandler)       // Вход
 	http.HandleFunc("DELETE /logout", authAPI.LogoutHandler)   // Выход
 
-	http.HandleFunc("POST /rooms", roomAPI.CreateRoomHandler)                            // Создание комнаты
-	http.HandleFunc("POST /rooms/{UUID}/tasks", roomAPI.AddTasksInRoomHandler)           // Добавление задач в комнату
-	http.HandleFunc("DELETE /rooms/{UUID}/tasks", roomAPI.DelTasksFromRoomHandler)       // Удаление задач из комнаты
-	http.HandleFunc("PATCH /rooms/{UUID}/tasks/{taskID}", roomAPI.SetTaskSuccessHandler) // Обновление статуса is_success задачи внутри комнаты
+	http.Handle("POST /rooms", authMiddlware.AuthMiddlwareWrap(http.HandlerFunc(roomAPI.CreateRoomHandler)))                            // Создание комнаты
+	http.Handle("POST /rooms/{UUID}/tasks", authMiddlware.AuthMiddlwareWrap(http.HandlerFunc(roomAPI.AddTasksInRoomHandler)))           // Добавление задач в комнату
+	http.Handle("DELETE /rooms/{UUID}/tasks", authMiddlware.AuthMiddlwareWrap(http.HandlerFunc(roomAPI.DelTasksFromRoomHandler)))       // Удаление задач из комнаты
+	http.Handle("PATCH /rooms/{UUID}/tasks/{taskID}", authMiddlware.AuthMiddlwareWrap(http.HandlerFunc(roomAPI.SetTaskSuccessHandler))) // Обновление статуса is_success задачи внутри комнаты
 
 	if err := http.ListenAndServe(":9091", nil); err != nil {
 		fmt.Println("Возникла ошибка!", err)

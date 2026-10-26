@@ -5,23 +5,18 @@ import (
 	"fmt"
 	"net/http"
 	"project/internal/handler"
+	"project/internal/middlware"
 	"project/internal/models"
 	"project/internal/service"
 )
 
 type RoomAPI struct {
 	roomService *service.RoomService
-	roomStorage RoomStorageAPI
 }
 
-type RoomStorageAPI interface {
-	GetSessionByUUID(UUID string) (string, error)
-}
-
-func NewRoomAPI(roomService *service.RoomService, roomStorage RoomStorageAPI) *RoomAPI {
+func NewRoomAPI(roomService *service.RoomService) *RoomAPI {
 	return &RoomAPI{
 		roomService: roomService,
-		roomStorage: roomStorage,
 	}
 }
 
@@ -36,16 +31,8 @@ func (rm *RoomAPI) CreateRoomHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Получаем id пользователя из cookie
-	cookie, err := r.Cookie("session_token")
-	sessionID := cookie.Value
-
-	userID, err := rm.roomStorage.GetSessionByUUID(sessionID)
-	if err != nil {
-		fmt.Println(err)
-		handler.SendErrResponse(w, err.Error(), http.StatusBadRequest)
-		return
-	}
+	// Получаем id из контекста middlware
+	userID := r.Context().Value(middlware.UserKeyID).(string)
 
 	// Вызов метода CreateRoom сервисного слоя
 	roomResult, err := rm.roomService.CreateRoom(userID, room)

@@ -128,9 +128,14 @@ func (p *PostgresStore) DelTasksFromRoom(roomUUID string, tasksList models.Tasks
 	query := `DELETE FROM rooms_tasks
  	WHERE room_id = $1 AND task_id = ANY($2::INT[]);`
 
-	if _, err := p.Pool.Exec(context.Background(), query, roomUUID, tasksList.TasksID); err != nil {
+	cmdTag, err := p.Pool.Exec(context.Background(), query, roomUUID, tasksList.TasksID)
+	if err != nil {
 		fmt.Println(err)
-		return err
+		return errors.New(handler.DeleteTaskError)
+	}
+
+	if cmdTag.RowsAffected() == 0 {
+		return errors.New(handler.TasksNotExists)
 	}
 
 	return nil

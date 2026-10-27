@@ -16,6 +16,7 @@ type RoundStorage interface {
 	IsUserInRoom(roomID string, userID int) (bool, error)
 	SubmitRound(roomID string, roundID string, userID int, input models.SubmitRoundInput) (*models.RoundSubmission, error)
 	ScheduleRoundFinish(roundID string, durationSeconds int)
+	GetRoundSubmissions(roomID string, roundID string) ([]models.RoundSubmission, error)
 }
 
 type RoundService struct {
@@ -111,4 +112,21 @@ func (s *RoundService) RoundDuration(startedAt time.Time, durationSeconds int) t
 	}
 
 	return remaining
+}
+
+func (s *RoundService) GetRoundSubmissions(roomID, roundID, userID string) ([]models.RoundSubmission, error) {
+	intUserID, err := strconv.Atoi(userID)
+	if err != nil {
+		return nil, errors.New("некорректный ID пользователя")
+	}
+
+	isMember, err := s.db.IsUserInRoom(roomID, intUserID)
+	if err != nil {
+		return nil, err
+	}
+	if !isMember {
+		return nil, handler.ErrNotRoomMember
+	}
+
+	return s.db.GetRoundSubmissions(roomID, roundID)
 }

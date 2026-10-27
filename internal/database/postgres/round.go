@@ -17,15 +17,28 @@ import (
 func (p *PostgresStore) CreateRound(roomID string, taskID, durationSeconds int) (*models.Round, error) {
 	ctx := context.Background()
 	roundID := uuid.NewString()
-	query := `INSERT INTO rounds (id, room_id, task_id, round_status, duration_seconds)
-		SELECT $1, rt.room_id, rt.task_id, 'active', $4
-		FROM rooms_tasks rt
-		WHERE rt.room_id = $2 AND rt.task_id = $3
-		RETURNING id, room_id, task_id, round_status, duration_seconds, started_at, ended_at;`
+	query := `WITH inserted AS (
+    INSERT INTO rounds (id, room_id, task_id, round_status, duration_seconds)
+    SELECT $1, rt.room_id, rt.task_id, 'active', $4
+    FROM rooms_tasks rt
+    WHERE rt.room_id = $2 AND rt.task_id = $3
+    RETURNING id, room_id, task_id, round_status, duration_seconds, started_at, ended_at)
+	SELECT i.id, i.room_id, i.task_id, t.title, t.description,
+		i.round_status, i.duration_seconds, i.started_at, i.ended_at
+	FROM inserted i
+	JOIN tasks t ON t.id = i.task_id;`
+
 	var round models.Round
 	err := p.Pool.QueryRow(ctx, query, roundID, roomID, taskID, durationSeconds).Scan(
-		&round.ID, &round.RoomID, &round.TaskID, &round.RoundStatus,
-		&round.DurationSeconds, &round.StartedAt, &round.EndedAt,
+		&round.ID,
+		&round.RoomID,
+		&round.TaskID,
+		&round.TaskTitle,
+		&round.TaskDescription,
+		&round.RoundStatus,
+		&round.DurationSeconds,
+		&round.StartedAt,
+		&round.EndedAt,
 	)
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -179,4 +192,54 @@ func (p *PostgresStore) ScheduleRoundFinish(roundID string, durationSeconds int)
 			fmt.Println("Не удалось завершить раунд:", err)
 		}
 	})
+}
+
+func (p *PostgresStore) GetRoundSubmissions(roomID, roundID string) ([]models.RoundSubmission, error) {
+	ctx := context.Background()
+
+	var exists bool
+	err := p.Pool.QueryRow(ctx, `
+        SELECT EXISTS (
+            SELECT 1 FROM rounds
+            WHERE id = $1 AND room_id = $2
+        );
+    `, roundID, roomID).Scan(&exists)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, handler.ErrRoundNotFound
+	}
+
+	rows, err := p.Pool.Query(ctx, `
+        SELECT id, round_id, user_id, source_code, language, submitted_at
+        FROM round_submissions
+        WHERE round_id = $1
+        ORDER BY submitted_at ASC;
+    `, roundID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	submissions := make([]models.RoundSubmission, 0)
+	for rows.Next() {
+		var submission models.RoundSubmission
+		if err := rows.Scan(
+			&submission.ID,
+			&submission.RoundID,
+			&submission.UserID,
+			&submission.SourceCode,
+			&submission.Language,
+			&submission.SubmittedAt,
+		); err != nil {
+			return nil, err
+		}
+		submissions = append(submissions, submission)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return submissions, nil
 }

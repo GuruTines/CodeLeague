@@ -77,6 +77,9 @@ func main() {
 	// Отправить решение — участник комнаты
 	http.Handle("POST /rooms/{UUID}/rounds/{roundID}/submissions", authMid.AuthMiddlwareWrap(http.HandlerFunc(roundAPI.SubmitRoundHandler)))
 
+	// Получить решения участников раунда
+	http.Handle("GET /rooms/{UUID}/rounds/{roundID}/submissions", authMid.AuthMiddlwareWrap(http.HandlerFunc(roundAPI.GetRoundSubmissionsHandler)))
+
 	// WEBSOCKET КОМНАТЫ
 	http.Handle("GET /rooms/{UUID}/ws", authMid.AuthMiddlwareWrap(http.HandlerFunc(wsHandler.ServeWS)))
 
@@ -86,4 +89,6 @@ func main() {
 	}
 }
 
-// 1) Обработать ошибки
+// При добавлении/удалении задач не от админа
+// IsAdminInRoom no rows in result set
+// AccessMiddlwareWrap2 no rows in result set

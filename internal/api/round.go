@@ -147,3 +147,24 @@ func (a *RoundAPI) SubmitRoundHandler(w http.ResponseWriter, r *http.Request) {
 
 	handler.SendJSON(w, submission, http.StatusCreated)
 }
+
+// GET /rooms/{UUID}/rounds/{roundID}/submissions
+func (a *RoundAPI) GetRoundSubmissionsHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middlware.UserKeyID).(string)
+	if !ok {
+		handler.SendErrResponse(w, handler.Unauthorized, http.StatusUnauthorized)
+		return
+	}
+
+	submissions, err := a.roundService.GetRoundSubmissions(
+		r.PathValue("UUID"),
+		r.PathValue("roundID"),
+		userID,
+	)
+	if err != nil {
+		sendRoundError(w, err)
+		return
+	}
+
+	handler.SendJSON(w, submissions, http.StatusOK)
+}

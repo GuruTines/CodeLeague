@@ -57,3 +57,17 @@ CREATE TABLE rounds (
     started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     ended_at TIMESTAMPTZ
 );
+
+
+CREATE TABLE task_tests (
+    id SERIAL PRIMARY KEY,
+    task_id INTEGER NOT NULL
+        REFERENCES tasks(id) ON DELETE CASCADE,
+
+    input TEXT NOT NULL,
+    expected_output TEXT NOT NULL,
+
+    is_sample BOOLEAN NOT NULL DEFAULT false,
+    position INTEGER NOT NULL DEFAULT 0
+        CHECK (position >= 0)
+);

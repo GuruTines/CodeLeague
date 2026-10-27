@@ -1,8 +1,8 @@
 package inmemory
 
 import (
-	"errors"
 	"fmt"
+	"project/internal/handler"
 	"strconv"
 )
 
@@ -19,7 +19,7 @@ func (i *InMemoryStore) GetSessionByUUID(UUID string) (string, error) {
 	value, ok := i.store[UUID]
 
 	if !ok {
-		return "", errors.New("Ключа не существует!")
+		return "", handler.ErrUserUnauthorized
 	}
 
 	fmt.Println(i.store)
@@ -29,7 +29,7 @@ func (i *InMemoryStore) GetSessionByUUID(UUID string) (string, error) {
 
 func (i *InMemoryStore) DeleteSessionByUUID(UUID string) error {
 	if _, ok := i.store[UUID]; !ok {
-		return errors.New("Ключа не существует!")
+		return handler.ErrUserUnauthorized
 	}
 
 	delete(i.store, UUID)

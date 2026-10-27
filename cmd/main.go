@@ -46,14 +46,18 @@ func main() {
 	authAPI := api.NewAuthAPI(authService, sessionService)
 	roomAPI := api.NewRoomAPI(roomService)
 
+	// АВТОРИЗАЦИЯ
 	http.HandleFunc("POST /register", authAPI.RegisterHandler) // Регистрация
 	http.HandleFunc("POST /login", authAPI.LoginHandler)       // Вход
 	http.HandleFunc("DELETE /logout", authAPI.LogoutHandler)   // Выход
 
-	http.Handle("POST /rooms", authMid.AuthMiddlwareWrap(http.HandlerFunc(roomAPI.CreateRoomHandler)))                                                           // Создание задачи
+	// КОМНАТЫ
+	http.Handle("POST /rooms", authMid.AuthMiddlwareWrap(http.HandlerFunc(roomAPI.CreateRoomHandler)))                                                           // Создание комнаты
+	http.Handle("DELETE /rooms/{UUID}", authMid.AuthMiddlwareWrap(accessMid.AccessMiddlwareWrap(http.HandlerFunc(roomAPI.DelRoomHandler))))                      // Удаление комнаты
 	http.Handle("POST /rooms/{UUID}/tasks", authMid.AuthMiddlwareWrap(accessMid.AccessMiddlwareWrap(http.HandlerFunc(roomAPI.AddTasksInRoomHandler))))           // Добавление задач в комнату
 	http.Handle("DELETE /rooms/{UUID}/tasks", authMid.AuthMiddlwareWrap(accessMid.AccessMiddlwareWrap(http.HandlerFunc(roomAPI.DelTasksFromRoomHandler))))       // Удаление задач из комнаты
 	http.Handle("PATCH /rooms/{UUID}/tasks/{taskID}", authMid.AuthMiddlwareWrap(accessMid.AccessMiddlwareWrap(http.HandlerFunc(roomAPI.SetTaskSuccessHandler)))) // Обновление статуса is_success задачи внутри комнаты
+	http.Handle("POST /rooms/{UUID}/users", authMid.AuthMiddlwareWrap(http.HandlerFunc(roomAPI.AddUserInRoomHandler)))                                           // Добавление пользователя в комнату
 
 	if err := http.ListenAndServe(":9091", nil); err != nil {
 		fmt.Println("Возникла ошибка!", err)

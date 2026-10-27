@@ -2,6 +2,7 @@ package middlware
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"project/internal/handler"
 )
@@ -28,6 +29,7 @@ func (a *AuthMiddlware) AuthMiddlwareWrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie("session_token")
 		if err != nil {
+			fmt.Println("AuthMiddlwareWrap1", err)
 			handler.SendErrResponse(w, handler.Unauthorized, http.StatusUnauthorized)
 			return
 		}
@@ -38,6 +40,7 @@ func (a *AuthMiddlware) AuthMiddlwareWrap(next http.Handler) http.Handler {
 		// Поиск id пользователя в redis
 		userID, err := a.authStorage.GetSessionByUUID(sessionID)
 		if err != nil {
+			fmt.Println("AuthMiddlwareWrap2", err)
 			errResponse, errCode := handler.GetErrorResponse(err)
 			handler.SendErrResponse(w, errResponse, errCode)
 			return

@@ -11,9 +11,11 @@ import (
 
 type RoomStorage interface {
 	CreateRoom(userID int, room models.RoomInput) (*models.Room, error)
+	DelRoom(roomUUID string) error
 	AddTasksInRoom(roomUUID string, tasksList models.TasksList) ([]models.Task, error)
 	DelTasksFromRoom(roomUUID string, tasksList models.TasksList) error
 	SetTaskSuccessRoom(roomUUID string, taskID int) error
+	AddUserInRoom(roomUUID string, userID int) error
 }
 
 type RoomService struct {
@@ -60,6 +62,14 @@ func (rm *RoomService) CreateRoom(userID string, room models.RoomInput) (*models
 	return roomResult, nil
 }
 
+func (rm *RoomService) DelRoom(roomUUID string) error {
+	if err := rm.db.DelRoom(roomUUID); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (rm *RoomService) AddTasksInRoom(roomUUID string, tasksList models.TasksList) ([]models.Task, error) {
 	if len(tasksList.TasksID) == 0 {
 		fmt.Println("Список задач пуст!")
@@ -100,6 +110,20 @@ func (rm *RoomService) SetTaskSuccess(roomUUID string, taskID string) error {
 
 	if err := rm.db.SetTaskSuccessRoom(roomUUID, intTaskID); err != nil {
 		fmt.Println(err)
+		return err
+	}
+
+	return nil
+}
+
+func (rm *RoomService) AddUserInRoom(roomUUID string, userID string) error {
+	intUserID, err := strconv.Atoi(userID)
+	if err != nil {
+		return err
+	}
+
+	err = rm.db.AddUserInRoom(roomUUID, intUserID)
+	if err != nil {
 		return err
 	}
 

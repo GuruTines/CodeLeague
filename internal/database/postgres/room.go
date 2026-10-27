@@ -55,6 +55,51 @@ func (p *PostgresStore) CreateRoom(userID int, room models.RoomInput) (*models.R
 	return &roomResult, nil
 }
 
+func (p *PostgresStore) DelRoom(roomUUID string) error {
+	tx, err := p.Pool.Begin(context.Background())
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(context.Background())
+
+	queryDelRoomsTasks := `DELETE FROM rooms_tasks
+	WHERE room_id = $1;`
+
+	queryDelUsersRooms := `DELETE FROM users_rooms
+	WHERE room_id = $1;`
+
+	queryDelRoom := `DELETE FROM rooms
+	WHERE id = $1;`
+
+	_, err = tx.Exec(context.Background(), queryDelRoomsTasks, roomUUID)
+	if err != nil {
+		fmt.Println("DelRoom1", err)
+		return err
+	}
+
+	_, err = tx.Exec(context.Background(), queryDelUsersRooms, roomUUID)
+	if err != nil {
+		fmt.Println("DelRoom2", err)
+		return err
+	}
+
+	cmdTag, err := tx.Exec(context.Background(), queryDelRoom, roomUUID)
+	if err != nil {
+		fmt.Println("DelRoom3", err)
+		return err
+	}
+	if cmdTag.RowsAffected() == 0 {
+		return handler.ErrRecordNotFound
+	}
+
+	if err = tx.Commit(context.Background()); err != nil {
+		fmt.Println("DelRoom Commit", err)
+		return err
+	}
+
+	return nil
+}
+
 func (p *PostgresStore) AddTasksInRoom(roomUUID string, tasksList models.TasksList) ([]models.Task, error) {
 	var task models.Task
 	var tasksResult []models.Task
@@ -163,4 +208,40 @@ func (p *PostgresStore) IsAdminInRoom(roomUUID string, userID string) (bool, err
 	}
 
 	return isAdmin, nil
+}
+
+func (p *PostgresStore) AddUserInRoom(roomUUID string, userID int) error {
+	tx, err := p.Pool.Begin(context.Background())
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(context.Background())
+
+	queryLockRaw := `SELECT COUNT(user_id) FROM users_rooms
+	WHERE room_id = $1;`
+
+	queryInsertUser := `INSERT INTO users_rooms (user_id, room_id)
+	SELECT $1, id FROM rooms
+	WHERE id = $2 AND capacity > (SELECT COUNT(*) FROM users_rooms WHERE room_id = $2);`
+
+	if _, err := tx.Exec(context.Background(), queryLockRaw, roomUUID); err != nil {
+		fmt.Println("AddUserInRoom1", err)
+		return err
+	}
+
+	cmdTag, err := tx.Exec(context.Background(), queryInsertUser, userID, roomUUID)
+	if err != nil {
+		fmt.Println("AddUserInRoom2", err)
+		return err
+	}
+	if cmdTag.RowsAffected() == 0 {
+		return handler.ErrMaxCapacity
+	}
+
+	if err := tx.Commit(context.Background()); err != nil {
+		fmt.Println("AddUserInRoom commit", err)
+		return err
+	}
+
+	return nil
 }

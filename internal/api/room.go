@@ -47,6 +47,17 @@ func (rm *RoomAPI) CreateRoomHandler(w http.ResponseWriter, r *http.Request) {
 	handler.SendJSON(w, roomResult, http.StatusCreated)
 }
 
+func (rm *RoomAPI) DelRoomHandler(w http.ResponseWriter, r *http.Request) {
+	roomUUID := r.PathValue("UUID")
+	if err := rm.roomService.DelRoom(roomUUID); err != nil {
+		errResponse, errCode := handler.GetErrorResponse(err)
+		handler.SendErrResponse(w, errResponse, errCode)
+		return
+	}
+
+	handler.SendJSON(w, nil, http.StatusOK)
+}
+
 func (rm *RoomAPI) AddTasksInRoomHandler(w http.ResponseWriter, r *http.Request) {
 	var tasksList models.TasksList
 
@@ -111,4 +122,18 @@ func (rm *RoomAPI) SetTaskSuccessHandler(w http.ResponseWriter, r *http.Request)
 	}
 
 	handler.SendJSON(w, nil, http.StatusNoContent)
+}
+
+func (rm *RoomAPI) AddUserInRoomHandler(w http.ResponseWriter, r *http.Request) {
+	roomUUID := r.PathValue("UUID")
+	userID := r.Context().Value(middlware.UserKeyID).(string)
+
+	err := rm.roomService.AddUserInRoom(roomUUID, userID)
+	if err != nil {
+		errResponse, errCode := handler.GetErrorResponse(err)
+		handler.SendErrResponse(w, errResponse, errCode)
+		return
+	}
+
+	handler.SendJSON(w, nil, http.StatusOK)
 }

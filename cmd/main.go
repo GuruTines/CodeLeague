@@ -8,6 +8,7 @@ import (
 	"project/internal/database/postgres"
 	"project/internal/middlware"
 	"project/internal/service"
+	"project/internal/websocket"
 )
 
 func main() {
@@ -41,10 +42,17 @@ func main() {
 	authService := service.NewAuthService(postgresStore)       // Авторизация
 	sessionService := service.NewSessionService(inMemoryStore) // Сессии
 	roomService := service.NewRoomService(postgresStore)       // Комнаты
+	roundService := service.NewRoundService(postgresStore)     // Раунды
 
 	// ТРАНСПОРТНЫЙ СЛОЙ ПРИЛОЖЕНИЯ
 	authAPI := api.NewAuthAPI(authService, sessionService)
 	roomAPI := api.NewRoomAPI(roomService)
+	roundAPI := api.NewRoundAPI(roundService)
+
+	// WEBSOCKET
+	wsHub := websocket.NewHub()
+	go wsHub.Run()
+	wsHandler := websocket.NewHandler(wsHub, postgresStore)
 
 	// АВТОРИЗАЦИЯ
 	http.HandleFunc("POST /register", authAPI.RegisterHandler) // Регистрация
@@ -58,6 +66,19 @@ func main() {
 	http.Handle("DELETE /rooms/{UUID}/tasks", authMid.AuthMiddlwareWrap(accessMid.AccessMiddlwareWrap(http.HandlerFunc(roomAPI.DelTasksFromRoomHandler))))       // Удаление задач из комнаты
 	http.Handle("PATCH /rooms/{UUID}/tasks/{taskID}", authMid.AuthMiddlwareWrap(accessMid.AccessMiddlwareWrap(http.HandlerFunc(roomAPI.SetTaskSuccessHandler)))) // Обновление статуса is_success задачи внутри комнаты
 	http.Handle("POST /rooms/{UUID}/users", authMid.AuthMiddlwareWrap(http.HandlerFunc(roomAPI.AddUserInRoomHandler)))                                           // Добавление пользователя в комнату
+
+	// РАУНДЫ
+	// Создать раунд — только администратор комнаты
+	http.Handle("POST /rooms/{UUID}/rounds", authMid.AuthMiddlwareWrap(accessMid.AccessMiddlwareWrap(http.HandlerFunc(roundAPI.StartRoundHandler))))
+
+	// Получить активный раунд — участник комнаты
+	http.Handle("GET /rooms/{UUID}/rounds/active", authMid.AuthMiddlwareWrap(http.HandlerFunc(roundAPI.GetActiveRoundHandler)))
+
+	// Отправить решение — участник комнаты
+	http.Handle("POST /rooms/{UUID}/rounds/{roundID}/submissions", authMid.AuthMiddlwareWrap(http.HandlerFunc(roundAPI.SubmitRoundHandler)))
+
+	// WEBSOCKET КОМНАТЫ
+	http.Handle("GET /rooms/{UUID}/ws", authMid.AuthMiddlwareWrap(http.HandlerFunc(wsHandler.ServeWS)))
 
 	if err := http.ListenAndServe(":9091", nil); err != nil {
 		fmt.Println("Возникла ошибка!", err)

@@ -45,3 +45,15 @@ CREATE TABLE rooms_tasks (
     FOREIGN KEY (task_id) REFERENCES tasks(id), 
     PRIMARY KEY (room_id, task_id)
 );
+
+CREATE TABLE rounds (
+    id UUID PRIMARY KEY,
+    room_id UUID NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+    task_id INTEGER NOT NULL REFERENCES tasks(id),
+    round_status VARCHAR(20) NOT NULL DEFAULT 'active'
+        CHECK (round_status IN ('active', 'finished')),
+    duration_seconds INTEGER NOT NULL
+        CHECK (duration_seconds > 0),
+    started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    ended_at TIMESTAMPTZ
+);

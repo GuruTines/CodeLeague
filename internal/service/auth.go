@@ -46,17 +46,17 @@ func lenValidate(user models.UserInput) error {
 	runeCountPassword := utf8.RuneCountInString(user.Password)
 
 	if runeCountUsername < 3 {
-		return errors.New(handler.ShortUsernameLen)
+		return handler.ErrShortUsernameLen
 	}
 	if runeCountUsername > 128 {
-		return errors.New(handler.LongUsernameLen)
+		return handler.ErrLongUsernameLen
 	}
 
 	if runeCountPassword < 8 {
-		return errors.New(handler.ShortPasswordLen)
+		return handler.ErrShortPasswordLen
 	}
 	if runeCountPassword > 64 {
-		return errors.New(handler.LongPasswordLen)
+		return handler.ErrLongPasswordLen
 	}
 
 	return nil
@@ -74,15 +74,15 @@ func passwordValidate(password string) error {
 	reDigit, _ := regexp.Compile("[0-9]+")
 
 	if !re.MatchString(password) {
-		return errors.New(handler.NotValidSymbols)
+		return handler.ErrInvalidSymbols
 	}
 
 	if !reLetter.MatchString(password) {
-		return errors.New(handler.OnlyLatinSymbol)
+		return handler.ErrLatinOnlySymbols
 	}
 
 	if !reDigit.MatchString(password) {
-		return errors.New(handler.AlwaysDigit)
+		return handler.ErrAlwaysDigit
 	}
 
 	return nil
@@ -101,7 +101,7 @@ func (a *AuthService) Register(user models.UserInput) (*models.UserJSON, error) 
 	hashedPassword, err := hashPassword(bytePassword)
 	if err != nil {
 		fmt.Println(err)
-		return nil, errors.New(handler.InternalServerError)
+		return nil, err
 	}
 	user.Password = string(hashedPassword)
 
@@ -122,17 +122,17 @@ func (a *AuthService) Login(user models.UserInput) (*models.UserJSON, error) {
 	userData, err := a.db.FindUserByUsername(user.Username)
 	if err != nil {
 		fmt.Println(err)
-		return nil, errors.New(handler.UserNotExists)
+		return nil, err
 	}
 
 	// Проверяем, что введенный пароль соответствует
 	// хэшу пароля из БД
 	if err := bcrypt.CompareHashAndPassword([]byte(userData.Password), []byte(user.Password)); err != nil {
-		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
-			return nil, errors.New(handler.UserNotExists)
-		}
 		fmt.Println(err)
-		return nil, errors.New(handler.PasswordCheckError)
+		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
+			return nil, handler.ErrInvalidUsernameOrPass
+		}
+		return nil, err
 	}
 
 	userResult := models.UserJSON{}

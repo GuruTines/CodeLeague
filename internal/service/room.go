@@ -63,7 +63,7 @@ func (rm *RoomService) CreateRoom(userID string, room models.RoomInput) (*models
 func (rm *RoomService) AddTasksInRoom(roomUUID string, tasksList models.TasksList) ([]models.Task, error) {
 	if len(tasksList.TasksID) == 0 {
 		fmt.Println("Список задач пуст!")
-		return nil, errors.New(handler.TasksListIsEmpty)
+		return nil, handler.ErrTasksListEmpty
 	}
 
 	// Вызов метода для добавления задач
@@ -79,7 +79,7 @@ func (rm *RoomService) AddTasksInRoom(roomUUID string, tasksList models.TasksLis
 func (rm *RoomService) DelTasksFromRoom(roomUUID string, tasksList models.TasksList) error {
 	if len(tasksList.TasksID) == 0 {
 		fmt.Println("Список задач пуст!")
-		return errors.New(handler.TasksListIsEmpty)
+		return handler.ErrTasksListEmpty
 	}
 
 	err := rm.db.DelTasksFromRoom(roomUUID, tasksList)
@@ -95,7 +95,7 @@ func (rm *RoomService) SetTaskSuccess(roomUUID string, taskID string) error {
 	intTaskID, err := strconv.Atoi(taskID)
 	if err != nil {
 		fmt.Println(err)
-		return errors.New(handler.InternalServerError)
+		return err
 	}
 
 	if err := rm.db.SetTaskSuccessRoom(roomUUID, intTaskID); err != nil {
@@ -105,22 +105,3 @@ func (rm *RoomService) SetTaskSuccess(roomUUID string, taskID string) error {
 
 	return nil
 }
-
-// func (rm *RoomService) IsAdminInRoom(roomUUID string, userID string) error {
-// 	intUserID, err := strconv.Atoi(userID)
-// 	if err != nil {
-// 		fmt.Println(err)
-// 		return errors.New(handler.InternalServerError)
-// 	}
-
-// 	isAdmin, err := rm.db.IsAdminInRoom(roomUUID, intUserID)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	if !isAdmin {
-// 		return errors.New(handler.NoRightsThisAction)
-// 	}
-
-// 	return nil
-// }

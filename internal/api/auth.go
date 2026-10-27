@@ -37,16 +37,19 @@ func (a *AuthAPI) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	// Вызов функции регистрации
 	userResult, err := a.authService.Register(user)
 	if err != nil {
-		fmt.Println("Ошибка RegisterHandler:", err)
-		handler.SendErrResponse(w, err.Error(), http.StatusBadRequest)
+		fmt.Println(err)
+		errResponse, errCode := handler.GetErrorResponse(err)
+		handler.SendErrResponse(w, errResponse, errCode)
 		return
 	}
 
 	// Вызов функции записи сессии в Redis
 	uuid, err := a.sessionService.CreateSession(userResult.ID)
 	if err != nil {
-		fmt.Println("Ошибка RegisterHandler:", err)
-		handler.SendErrResponse(w, err.Error(), http.StatusBadRequest)
+		fmt.Println(err)
+		errResponse, errCode := handler.GetErrorResponse(err)
+		handler.SendErrResponse(w, errResponse, errCode)
+		return
 	}
 
 	http.SetCookie(w, &http.Cookie{
@@ -67,14 +70,15 @@ func (a *AuthAPI) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&user); err != nil {
-		fmt.Println("Ошибка LoginHandler:", err)
-		handler.SendErrResponse(w, err.Error(), http.StatusBadRequest)
+		fmt.Println(err)
+		errResponse, errCode := handler.GetErrorResponse(err)
+		handler.SendErrResponse(w, errResponse, errCode)
 		return
 	}
 
 	userResult, err := a.authService.Login(user)
 	if err != nil {
-		fmt.Println("Ошибка LoginHandler:", err)
+		fmt.Println(err)
 		handler.SendErrResponse(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -82,8 +86,10 @@ func (a *AuthAPI) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	// Вызов функции записи сессии в Redis
 	uuid, err := a.sessionService.CreateSession(userResult.ID)
 	if err != nil {
-		fmt.Println("Ошибка RegisterHandler:", err)
-		handler.SendErrResponse(w, err.Error(), http.StatusBadRequest)
+		fmt.Println(err)
+		errResponse, errCode := handler.GetErrorResponse(err)
+		handler.SendErrResponse(w, errResponse, errCode)
+		return
 	}
 
 	http.SetCookie(w, &http.Cookie{
@@ -101,14 +107,17 @@ func (a *AuthAPI) LoginHandler(w http.ResponseWriter, r *http.Request) {
 func (a *AuthAPI) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("session_token")
 	if err != nil {
-		fmt.Println("Ошибка получения cookie", err)
-		handler.SendErrResponse(w, err.Error(), http.StatusUnauthorized)
+		fmt.Println(err)
+		errResponse, errCode := handler.GetErrorResponse(err)
+		handler.SendErrResponse(w, errResponse, errCode)
+		return
 	}
 
 	uuid := cookie.Value
 	if err := a.sessionService.DeleteSession(uuid); err != nil {
-		fmt.Println("Ошибка LogoutHandler", err)
-		handler.SendErrResponse(w, err.Error(), http.StatusInternalServerError)
+		fmt.Println(err)
+		errResponse, errCode := handler.GetErrorResponse(err)
+		handler.SendErrResponse(w, errResponse, errCode)
 		return
 	}
 

@@ -30,7 +30,8 @@ func (a *AccessMiddlware) AccessMiddlwareWrap(next http.Handler) http.Handler {
 
 		isAdmin, err := a.accessStorage.IsAdminInRoom(roomUUID, userID)
 		if err != nil {
-			handler.SendErrResponse(w, err.Error(), http.StatusInternalServerError)
+			errResponse, errCode := handler.GetErrorResponse(err)
+			handler.SendErrResponse(w, errResponse, errCode)
 			return
 		}
 

@@ -27,7 +27,8 @@ func (rm *RoomAPI) CreateRoomHandler(w http.ResponseWriter, r *http.Request) {
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&room); err != nil {
 		fmt.Println(err)
-		handler.SendErrResponse(w, err.Error(), http.StatusBadRequest)
+		errResponse, errCode := handler.GetErrorResponse(err)
+		handler.SendErrResponse(w, errResponse, errCode)
 		return
 	}
 
@@ -37,7 +38,9 @@ func (rm *RoomAPI) CreateRoomHandler(w http.ResponseWriter, r *http.Request) {
 	// Вызов метода CreateRoom сервисного слоя
 	roomResult, err := rm.roomService.CreateRoom(userID, room)
 	if err != nil {
-		handler.SendErrResponse(w, err.Error(), http.StatusBadRequest)
+		fmt.Println(err)
+		errResponse, errCode := handler.GetErrorResponse(err)
+		handler.SendErrResponse(w, errResponse, errCode)
 		return
 	}
 
@@ -50,7 +53,9 @@ func (rm *RoomAPI) AddTasksInRoomHandler(w http.ResponseWriter, r *http.Request)
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&tasksList); err != nil {
-		handler.SendErrResponse(w, err.Error(), http.StatusBadRequest)
+		fmt.Println(err)
+		errResponse, errCode := handler.GetErrorResponse(err)
+		handler.SendErrResponse(w, errResponse, errCode)
 		return
 	}
 
@@ -60,7 +65,9 @@ func (rm *RoomAPI) AddTasksInRoomHandler(w http.ResponseWriter, r *http.Request)
 	// в таблице связи rooms_tasks
 	tasks, err := rm.roomService.AddTasksInRoom(roomUUID, tasksList)
 	if err != nil {
-		handler.SendErrResponse(w, err.Error(), http.StatusBadRequest)
+		fmt.Println(err)
+		errResponse, errCode := handler.GetErrorResponse(err)
+		handler.SendErrResponse(w, errResponse, errCode)
 		return
 	}
 
@@ -83,7 +90,9 @@ func (rm *RoomAPI) DelTasksFromRoomHandler(w http.ResponseWriter, r *http.Reques
 	// в таблице связи rooms_tasks
 	err := rm.roomService.DelTasksFromRoom(roomUUID, roomTasks)
 	if err != nil {
-		handler.SendErrResponse(w, err.Error(), http.StatusBadRequest)
+		fmt.Println(err)
+		errResponse, errCode := handler.GetErrorResponse(err)
+		handler.SendErrResponse(w, errResponse, errCode)
 		return
 	}
 
@@ -95,7 +104,9 @@ func (rm *RoomAPI) SetTaskSuccessHandler(w http.ResponseWriter, r *http.Request)
 	taskID := r.PathValue("taskID")
 
 	if err := rm.roomService.SetTaskSuccess(roomUUID, taskID); err != nil {
-		handler.SendErrResponse(w, err.Error(), http.StatusBadRequest)
+		fmt.Println(err)
+		errResponse, errCode := handler.GetErrorResponse(err)
+		handler.SendErrResponse(w, errResponse, errCode)
 		return
 	}
 

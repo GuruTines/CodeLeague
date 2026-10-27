@@ -31,6 +31,7 @@ func SendErrResponse(w http.ResponseWriter, message string, statusCode int) {
 		// то лучше напрямую передать ее через обертку
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Внутренняя ошибка сервера!"))
+		return
 	}
 
 	w.WriteHeader(statusCode)

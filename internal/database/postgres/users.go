@@ -26,12 +26,10 @@ func (p *PostgresStore) CreateUser(user models.UserInput) (*models.UserJSON, err
 		if errors.As(err, &pgErr) {
 			// Нарушение ограничения UNIQUE
 			if pgErr.Code == "23505" {
-				return nil, errors.New(handler.UserNowExists)
-			} else {
-				return nil, errors.New("Хардкод! Код не 23505")
+				return nil, handler.ErrUserExists
 			}
 		}
-		return nil, errors.New(handler.RegisterUserError)
+		return nil, err
 	}
 
 	return &userResult, nil
@@ -49,7 +47,7 @@ func (p *PostgresStore) FindUserByUsername(username string) (*models.User, error
 		&userResult.CreatedAt,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, errors.New(handler.UserNotExists)
+			return nil, handler.ErrUserExists
 		}
 		return nil, err
 	}

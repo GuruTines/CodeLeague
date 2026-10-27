@@ -7,12 +7,12 @@ import (
 	"project/internal/handler"
 	"project/internal/models"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
 func (p *PostgresStore) CreateRoom(userID int, room models.RoomInput) (*models.Room, error) {
 	var roomResult models.Room
+	var pgErr *pgconn.PgError
 
 	tx, err := p.Pool.Begin(context.Background())
 	if err != nil {
@@ -34,6 +34,12 @@ func (p *PostgresStore) CreateRoom(userID int, room models.RoomInput) (*models.R
 		&roomResult.IsPrivate,
 		&roomResult.Capacity,
 	); err != nil {
+		if errors.As(err, &pgErr) {
+			// Нарушение Check
+			if pgErr.Code == "23514" {
+				return nil, handler.ErrMaxCapacity
+			}
+		}
 		return nil, err
 	}
 
@@ -42,10 +48,6 @@ func (p *PostgresStore) CreateRoom(userID int, room models.RoomInput) (*models.R
 	}
 
 	if err = tx.Commit(context.Background()); err != nil {
-		if errors.Is(err, pgx.ErrTxCommitRollback) {
-			fmt.Println(err)
-			return nil, fmt.Errorf("Произошел откат!\n%v", err)
-		}
 		fmt.Println(err)
 		return nil, err
 	}
@@ -77,12 +79,12 @@ func (p *PostgresStore) AddTasksInRoom(roomUUID string, tasksList models.TasksLi
 			// Нарушение FK
 			if pgErr.Code == "23503" {
 				fmt.Println(err)
-				return nil, errors.New(handler.TasksNotExists)
+				return nil, handler.ErrRecordNotFound
 			}
 			// Нарушение PK
 			if pgErr.Code == "23505" {
 				fmt.Println(err)
-				return nil, errors.New(handler.TasksExists)
+				return nil, handler.ErrTasksAlreadyAdded
 			}
 		}
 
@@ -109,14 +111,10 @@ func (p *PostgresStore) AddTasksInRoom(roomUUID string, tasksList models.TasksLi
 
 	if err = rows.Err(); err != nil {
 		fmt.Println(err)
-		return nil, fmt.Errorf("Возникла ошибка при чтении или выполнении запроса!\n%v", err)
+		return nil, err
 	}
 
 	if err = tx.Commit(context.Background()); err != nil {
-		if errors.Is(err, pgx.ErrTxCommitRollback) {
-			fmt.Println(err)
-			return nil, fmt.Errorf("Произошел откат!\n%v", err)
-		}
 		fmt.Println(err)
 		return nil, err
 	}
@@ -131,33 +129,23 @@ func (p *PostgresStore) DelTasksFromRoom(roomUUID string, tasksList models.Tasks
 	cmdTag, err := p.Pool.Exec(context.Background(), query, roomUUID, tasksList.TasksID)
 	if err != nil {
 		fmt.Println(err)
-		return errors.New(handler.DeleteTaskError)
+		return err
 	}
 
 	if cmdTag.RowsAffected() == 0 {
-		return errors.New(handler.TasksNotExists)
+		return handler.ErrTaskNotFound
 	}
 
 	return nil
 }
 
 func (p *PostgresStore) SetTaskSuccessRoom(roomUUID string, taskID int) error {
-	var pgErr *pgconn.PgError
-
 	query := `UPDATE rooms_tasks SET is_success = true
 	WHERE room_id = $1 AND task_id = $2;`
 
 	if _, err := p.Pool.Exec(context.Background(), query, roomUUID, taskID); err != nil {
-		// Нарушение FK
-		if errors.As(err, &pgErr) {
-			if pgErr.Code == "23503" {
-				fmt.Println(err)
-				return errors.New(handler.TasksNotExists)
-			}
-			return errors.New("Необработанная ошибка pgErr")
-		}
-
-		return errors.New(handler.SetTaskStatusError)
+		fmt.Println("SetTaskSuccessRoom", err)
+		return err
 	}
 
 	return nil
@@ -165,20 +153,13 @@ func (p *PostgresStore) SetTaskSuccessRoom(roomUUID string, taskID int) error {
 
 func (p *PostgresStore) IsAdminInRoom(roomUUID string, userID string) (bool, error) {
 	var isAdmin bool
-	var pgErr *pgconn.PgError
 
 	query := `SELECT is_admin FROM users_rooms
 	WHERE room_id = $1 AND user_id = $2;`
 
 	if err := p.Pool.QueryRow(context.Background(), query, roomUUID, userID).Scan(&isAdmin); err != nil {
-		fmt.Println(err)
-		if errors.As(err, &pgErr) {
-			if pgErr.Code == "23503" {
-				return false, errors.New(handler.WriteNotExists)
-			}
-			return false, errors.New("Необработанная ошибка pgErr")
-		}
-		return false, errors.New(handler.AddTaskError)
+		fmt.Println("IsAdminInRoom", err)
+		return false, err
 	}
 
 	return isAdmin, nil

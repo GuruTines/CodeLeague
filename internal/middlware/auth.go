@@ -38,7 +38,8 @@ func (a *AuthMiddlware) AuthMiddlwareWrap(next http.Handler) http.Handler {
 		// Поиск id пользователя в redis
 		userID, err := a.authStorage.GetSessionByUUID(sessionID)
 		if err != nil {
-			handler.SendErrResponse(w, err.Error(), http.StatusUnauthorized)
+			errResponse, errCode := handler.GetErrorResponse(err)
+			handler.SendErrResponse(w, errResponse, errCode)
 			return
 		}
 

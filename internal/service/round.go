@@ -1,10 +1,14 @@
 package service
 
 import (
+	"context"
 	"errors"
+	"log"
 	"strconv"
 	"strings"
 	"time"
+
+	"project/internal/judgeclient"
 
 	"project/internal/handler"
 	"project/internal/models"
@@ -15,16 +19,30 @@ type RoundStorage interface {
 	GetActiveRound(roomID string) (*models.Round, error)
 	IsUserInRoom(roomID string, userID int) (bool, error)
 	SubmitRound(roomID string, roundID string, userID int, input models.SubmitRoundInput) (*models.RoundSubmission, error)
-	ScheduleRoundFinish(roundID string, durationSeconds int)
 	GetRoundSubmissions(roomID string, roundID string) ([]models.RoundSubmission, error)
+	GetTaskTests(taskID int) ([]models.TaskTest, error)
+	UpdateSubmissionResult(submissionID string, verdict string, passedTests int, totalTests int, executionTimeMS int, memoryUsedKB int, compileOutput string) error
+	FinishRound(roundID string) (bool, error)
+	GetSubmittedUserIDs(roundID string) ([]int, error)
+}
+
+type Realtime interface {
+	OnlineUserIDs(roomID string) []int
+	BroadcastEvent(roomID, eventType, payload string)
 }
 
 type RoundService struct {
-	db RoundStorage
+	db    RoundStorage
+	judge *judgeclient.Client
+	rt    Realtime
 }
 
-func NewRoundService(db RoundStorage) *RoundService {
-	return &RoundService{db: db}
+func NewRoundService(db RoundStorage, judge *judgeclient.Client, rt Realtime) *RoundService {
+	return &RoundService{
+		db:    db,
+		judge: judge,
+		rt:    rt,
+	}
 }
 
 func (s *RoundService) StartRound(roomID string, input models.StartRoundInput) (*models.Round, error) {
@@ -33,24 +51,15 @@ func (s *RoundService) StartRound(roomID string, input models.StartRoundInput) (
 	}
 
 	if input.DurationSeconds < 30 || input.DurationSeconds > 7200 {
-		return nil, errors.New(
-			"длительность раунда должна быть от 30 до 7200 секунд",
-		)
+		return nil, errors.New("длительность раунда должна быть от 30 до 7200 секунд")
 	}
 
-	round, err := s.db.CreateRound(
-		roomID,
-		input.TaskID,
-		input.DurationSeconds,
-	)
+	round, err := s.db.CreateRound(roomID, input.TaskID, input.DurationSeconds)
 	if err != nil {
 		return nil, err
 	}
 
-	s.db.ScheduleRoundFinish(
-		round.ID,
-		round.DurationSeconds,
-	)
+	s.ScheduleRoundFinish(round.RoomID, round.ID, round.DurationSeconds)
 
 	return round, nil
 }
@@ -95,12 +104,73 @@ func (s *RoundService) SubmitRound(roomID string, roundID string, userID string,
 		return nil, errors.New("название языка слишком длинное")
 	}
 
-	return s.db.SubmitRound(
+	round, err := s.db.GetActiveRound(roomID)
+	if err != nil {
+		return nil, err
+	}
+	if round == nil || round.ID != roundID {
+		return nil, handler.ErrRoundInactive
+	}
+
+	submission, err := s.db.SubmitRound(
 		roomID,
 		roundID,
 		intUserID,
 		input,
 	)
+	if err != nil {
+		return nil, err
+	}
+
+	defer s.finishIfAllOnlineSubmitted(roomID, roundID, intUserID)
+
+	taskTests, err := s.db.GetTaskTests(round.TaskID)
+	if err != nil {
+		return submission, err
+	}
+
+	tests := make([]judgeclient.TestCase, 0, len(taskTests))
+	for _, test := range taskTests {
+		tests = append(tests, judgeclient.TestCase{
+			Input:          test.Input,
+			ExpectedOutput: test.ExpectedOutput,
+		})
+	}
+
+	result, err := s.judge.Judge(context.Background(), judgeclient.Request{
+		Language:           input.Language,
+		SourceCode:         input.SourceCode,
+		Tests:              tests,
+		TimeLimitMS:        2000,
+		MemoryLimitMB:      256,
+		CompareMode:        "tokens",
+		StopOnFirstFailure: false,
+	})
+	if err != nil {
+		return submission, err
+	}
+
+	err = s.db.UpdateSubmissionResult(
+		submission.ID,
+		result.Verdict,
+		result.Passed,
+		result.Total,
+		result.TimeMS,
+		result.MemoryKB,
+		result.CompileOutput,
+	)
+	if err != nil {
+		return submission, err
+	}
+
+	submission.Verdict = result.Verdict
+	submission.PassedTests = result.Passed
+	submission.TotalTests = result.Total
+	submission.ExecutionTimeMS = result.TimeMS
+	submission.MemoryUsedKB = result.MemoryKB
+	submission.CompileOutput = result.CompileOutput
+
+	return submission, nil
 }
 
 func (s *RoundService) RoundDuration(startedAt time.Time, durationSeconds int) time.Duration {
@@ -129,4 +199,64 @@ func (s *RoundService) GetRoundSubmissions(roomID, roundID, userID string) ([]mo
 	}
 
 	return s.db.GetRoundSubmissions(roomID, roundID)
+}
+
+func (s *RoundService) ScheduleRoundFinish(roomID string, roundID string, durationSeconds int) {
+	time.AfterFunc(time.Duration(durationSeconds)*time.Second, func() {
+		s.finishRound(roomID, roundID)
+	})
+}
+
+func (s *RoundService) finishRound(roomID, roundID string) {
+	changed, err := s.db.FinishRound(roundID)
+	if err != nil {
+		log.Println("Не удалось завершить раунд:", err)
+		return
+	}
+	if changed && s.rt != nil {
+		s.rt.BroadcastEvent(roomID, "round_finished", roundID)
+	}
+}
+
+func (s *RoundService) finishIfAllOnlineSubmitted(roomID, roundID string, extraOnline ...int) {
+	if s.rt == nil {
+		return
+	}
+
+	waiting := make(map[int]struct{})
+	for _, id := range s.rt.OnlineUserIDs(roomID) {
+		waiting[id] = struct{}{}
+	}
+	for _, id := range extraOnline {
+		waiting[id] = struct{}{}
+	}
+	if len(waiting) == 0 {
+		return
+	}
+
+	submitted, err := s.db.GetSubmittedUserIDs(roundID)
+	if err != nil {
+		log.Println("Не удалось получить список сдавших:", err)
+		return
+	}
+	for _, id := range submitted {
+		delete(waiting, id)
+	}
+	if len(waiting) > 0 {
+		return
+	}
+
+	s.finishRound(roomID, roundID)
+}
+
+func (s *RoundService) OnUserOffline(roomID string, _ int) {
+	round, err := s.db.GetActiveRound(roomID)
+	if err != nil {
+		log.Println("Не удалось получить активный раунд:", err)
+		return
+	}
+	if round == nil {
+		return
+	}
+	s.finishIfAllOnlineSubmitted(roomID, round.ID)
 }

@@ -1,7 +1,7 @@
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     username VARCHAR(128) NOT NULL UNIQUE,
-    password VARCHAR(256) NOT NULL,
+    password VARCHAR(64) NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -71,3 +71,25 @@ CREATE TABLE task_tests (
     position INTEGER NOT NULL DEFAULT 0
         CHECK (position >= 0)
 );
+
+CREATE TABLE round_submissions (
+    id UUID PRIMARY KEY,
+    round_id UUID NOT NULL
+        REFERENCES rounds(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL
+        REFERENCES users(id),
+    source_code TEXT NOT NULL,
+    language VARCHAR(30) NOT NULL,
+    submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT unique_user_submission_per_round
+        UNIQUE (round_id, user_id)
+);
+
+ALTER TABLE round_submissions
+    ADD COLUMN verdict VARCHAR(30),
+    ADD COLUMN passed_tests INTEGER NOT NULL DEFAULT 0,
+    ADD COLUMN total_tests INTEGER NOT NULL DEFAULT 0,
+    ADD COLUMN execution_time_ms INTEGER NOT NULL DEFAULT 0,
+    ADD COLUMN memory_used_kb INTEGER NOT NULL DEFAULT 0,
+    ADD COLUMN compile_output TEXT NOT NULL DEFAULT '';

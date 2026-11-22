@@ -1,0 +1,63 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "9091:9091"
+    environment:
+      DATABASE_URL: "postgres://postgres:postgres@postgres:5432/code_league?sslmode=disable"
+      JUDGE_BASE_URL: "http://judge:8081"
+      REDIS_ADDR: "redis:6379"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      judge:
+        condition: service_started
+      redis:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379" 
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: code_league
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d code_league"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  judge:
+    build:
+      context: ./judge/codeleague-judge
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
+    cap_add:
+      - SYS_ADMIN
+      - SETUID
+      - SETGID
+      - CHOWN
+
+volumes:
+  postgres_data:
+  redis_data:

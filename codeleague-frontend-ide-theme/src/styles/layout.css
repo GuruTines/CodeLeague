@@ -1,0 +1,74 @@
+.layout { min-height: 100dvh; display: flex; flex-direction: column; }
+.layout-app { height: 100dvh; }
+.main { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.page { padding-block: 40px 72px; }
+.page-center { flex: 1; display: grid; place-items: center; padding: 60px 20px; }
+.page-head { margin-bottom: 28px; display: flex; justify-content: space-between; gap: 20px; }
+.page-head h1 { font-size: clamp(28px, 4vw, 38px); }
+.page-head p { margin-top: 10px; color: var(--text-dim); max-width: 60ch; }
+
+/* Header */
+.header { position: sticky; top: 0; z-index: 50; height: var(--header-h); flex: none; background: rgba(8, 10, 20, 0.72); backdrop-filter: blur(16px) saturate(1.4); border-bottom: 1px solid var(--line); }
+.header-inner { height: 100%; width: min(1280px, 100% - 32px); margin-inline: auto; display: flex; align-items: center; gap: 28px; }
+.header-logo { text-decoration: none; }
+.logo { display: inline-flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; letter-spacing: -0.02em; }
+.header-nav { display: flex; align-items: center; gap: 4px; flex: 1; }
+.header-nav a { padding: 8px 14px; border-radius: 999px; color: var(--text-dim); text-decoration: none; font-weight: 520; font-size: 14.5px; }
+.header-nav a:hover { color: var(--text); background: rgba(255, 255, 255, 0.06); }
+.header-nav a.active { color: var(--text); background: rgba(139, 108, 255, 0.18); }
+.header-nav-auth { display: none; }
+.header-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.header-auth-desktop { display: flex; gap: 8px; }
+.header-burger { display: none; }
+.user-menu { position: relative; }
+.user-chip { display: flex; align-items: center; gap: 9px; height: 40px; padding: 0 12px 0 6px; border-radius: 999px; border: 1px solid var(--line-strong); background: rgba(255, 255, 255, 0.04); }
+.user-chip:hover { background: rgba(255, 255, 255, 0.09); }
+.user-chip-name { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 550; font-size: 14px; }
+.menu { position: absolute; right: 0; top: calc(100% + 8px); min-width: 220px; padding: 6px; border-radius: 14px; background: var(--panel-2); border: 1px solid var(--line-strong); box-shadow: 0 24px 60px -12px rgba(0, 0, 0, 0.7); animation: pop 0.14s ease-out; }
+.menu-head { padding: 10px 12px 12px; display: grid; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
+.menu-head small { color: var(--text-faint); }
+.menu a, .menu button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 12px; border: 0; border-radius: 9px; background: none; color: var(--text); text-decoration: none; font-size: 14px; text-align: left; }
+.menu a:hover, .menu button:hover { background: rgba(255, 255, 255, 0.08); }
+
+.footer { border-top: 1px solid var(--line); padding: 36px 0; margin-top: 40px; }
+.footer-inner { width: min(1180px, 100% - 40px); margin-inline: auto; display: flex; align-items: center; gap: 28px; flex-wrap: wrap; justify-content: space-between; }
+.footer nav { display: flex; gap: 22px; }
+.footer nav a { color: var(--text-dim); text-decoration: none; font-size: 14px; }
+.footer nav a:hover { color: var(--text); }
+.footer small { color: var(--text-faint); }
+
+@media (max-width: 860px) {
+  .header-inner { gap: 12px; }
+  .header-burger { display: inline-grid; }
+  .header-auth-desktop { display: none; }
+  .header-nav { position: absolute; left: 0; right: 0; top: var(--header-h); flex-direction: column; align-items: stretch; padding: 12px 16px 18px; background: rgba(10, 12, 26, 0.97); border-bottom: 1px solid var(--line); display: none; }
+  .header-nav.open { display: flex; }
+  .header-nav a { padding: 12px 14px; }
+  .header-nav-auth { display: flex; gap: 8px; padding-top: 10px; }
+  .user-chip-name { display: none; }
+  .user-chip { padding: 0 8px 0 6px; }
+}
+.layout-app .header-inner { width: calc(100% - 40px); max-width: none; }
+
+
+/* Editor-like application chrome */
+.header {
+  background: #181818;
+  backdrop-filter: none;
+  border-bottom-color: #333;
+}
+.header-inner { gap: 18px; }
+.header-nav { gap: 0; }
+.header-nav a {
+  border-radius: 3px;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+.header-nav a.active {
+  background: transparent;
+  box-shadow: inset 0 -2px #3794ff;
+  color: #fff;
+}
+.header-nav a:hover { background: #252526; }
+.user-chip { border-radius: 4px; background: #252526; border-color: #3c3c3c; }
+.menu { border-radius: 4px; background: #252526; border-color: #454545; }

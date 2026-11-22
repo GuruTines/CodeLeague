@@ -25,10 +25,17 @@ type SubmitRoundInput struct {
 }
 
 type RoundSubmission struct {
-	ID          string    `json:"id"`
-	RoundID     string    `json:"round_id"`
-	UserID      int       `json:"user_id"`
-	SourceCode  string    `json:"source_code"`
-	Language    string    `json:"language"`
-	SubmittedAt time.Time `json:"submitted_at"`
+	ID              string    `json:"id"`
+	RoundID         string    `json:"round_id"`
+	UserID          int       `json:"user_id"`
+	Username        string    `json:"username,omitempty"`
+	SourceCode      string    `json:"source_code"`
+	Language        string    `json:"language"`
+	SubmittedAt     time.Time `json:"submitted_at"`
+	Verdict         string    `json:"verdict,omitempty"`
+	PassedTests     int       `json:"passed_tests"`
+	TotalTests      int       `json:"total_tests"`
+	ExecutionTimeMS int       `json:"execution_time_ms"`
+	MemoryUsedKB    int       `json:"memory_used_kb"`
+	CompileOutput   string    `json:"compile_output,omitempty"`
 }

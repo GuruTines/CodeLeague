@@ -137,3 +137,52 @@ func (rm *RoomAPI) AddUserInRoomHandler(w http.ResponseWriter, r *http.Request) 
 
 	handler.SendJSON(w, nil, http.StatusOK)
 }
+
+func (rm *RoomAPI) GetAllRoomsHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middlware.UserKeyID).(string)
+	if !ok {
+		handler.SendErrResponse(w, handler.Unauthorized, http.StatusUnauthorized)
+		return
+	}
+
+	rooms, err := rm.roomService.GetAllRooms(userID)
+	if err != nil {
+		errResponse, errCode := handler.GetErrorResponse(err)
+		handler.SendErrResponse(w, errResponse, errCode)
+		return
+	}
+
+	handler.SendJSON(w, rooms, http.StatusOK)
+}
+
+func (rm *RoomAPI) GetRoomHandler(w http.ResponseWriter, r *http.Request) {
+	userID, ok := r.Context().Value(middlware.UserKeyID).(string)
+	if !ok {
+		handler.SendErrResponse(w, handler.Unauthorized, http.StatusUnauthorized)
+		return
+	}
+
+	room, err := rm.roomService.GetRoom(r.PathValue("UUID"), userID)
+	if err != nil {
+		errResponse, errCode := handler.GetErrorResponse(err)
+		handler.SendErrResponse(w, errResponse, errCode)
+		return
+	}
+
+	handler.SendJSON(w, room, http.StatusOK)
+}
+
+func (rm *RoomAPI) GetMyRoomsHandler(w http.ResponseWriter, r *http.Request) {
+	userID := r.Context().Value(middlware.UserKeyID).(string)
+
+	rooms, err := rm.roomService.GetMyRooms(userID)
+	if err != nil {
+		fmt.Println(err)
+
+		errResponse, errCode := handler.GetErrorResponse(err)
+		handler.SendErrResponse(w, errResponse, errCode)
+		return
+	}
+
+	handler.SendJSON(w, rooms, http.StatusOK)
+}

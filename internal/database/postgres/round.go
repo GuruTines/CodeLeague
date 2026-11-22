@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"project/internal/handler"
 	"project/internal/models"
@@ -154,44 +153,39 @@ func (p *PostgresStore) SubmitRound(roomID, roundID string, userID int, input mo
 		return nil, err
 	}
 
-	var memberCount, submissionCount int
-	err = tx.QueryRow(ctx, `SELECT COUNT(*) FROM users_rooms WHERE room_id = $1;`, roomID).Scan(&memberCount)
-	if err != nil {
-		return nil, err
-	}
-	err = tx.QueryRow(ctx, `SELECT COUNT(*) FROM round_submissions WHERE round_id = $1;`, roundID).Scan(&submissionCount)
-	if err != nil {
-		return nil, err
-	}
-	if memberCount > 0 && submissionCount >= memberCount {
-		_, err = tx.Exec(ctx, `UPDATE rounds SET round_status = 'finished', ended_at = NOW()
-			WHERE id = $1 AND round_status = 'active';`, roundID)
-		if err != nil {
-			return nil, err
-		}
-	}
 	if err := tx.Commit(ctx); err != nil {
 		return nil, err
 	}
 	return &submission, nil
 }
 
-func (p *PostgresStore) FinishRound(roundID string) error {
-	_, err := p.Pool.Exec(context.Background(), `UPDATE rounds
+func (p *PostgresStore) FinishRound(roundID string) (bool, error) {
+	tag, err := p.Pool.Exec(context.Background(), `UPDATE rounds
 		SET round_status = 'finished', ended_at = NOW()
 		WHERE id = $1 AND round_status = 'active';`, roundID)
 	if err != nil {
-		return fmt.Errorf("finish round: %w", err)
+		return false, fmt.Errorf("finish round: %w", err)
 	}
-	return nil
+	return tag.RowsAffected() > 0, nil
 }
 
-func (p *PostgresStore) ScheduleRoundFinish(roundID string, durationSeconds int) {
-	time.AfterFunc(time.Duration(durationSeconds)*time.Second, func() {
-		if err := p.FinishRound(roundID); err != nil {
-			fmt.Println("Не удалось завершить раунд:", err)
+func (p *PostgresStore) GetSubmittedUserIDs(roundID string) ([]int, error) {
+	rows, err := p.Pool.Query(context.Background(),
+		`SELECT user_id FROM round_submissions WHERE round_id = $1;`, roundID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	ids := make([]int, 0)
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
 		}
-	})
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
 }
 
 func (p *PostgresStore) GetRoundSubmissions(roomID, roundID string) ([]models.RoundSubmission, error) {
@@ -212,10 +206,13 @@ func (p *PostgresStore) GetRoundSubmissions(roomID, roundID string) ([]models.Ro
 	}
 
 	rows, err := p.Pool.Query(ctx, `
-        SELECT id, round_id, user_id, source_code, language, submitted_at
-        FROM round_submissions
-        WHERE round_id = $1
-        ORDER BY submitted_at ASC;
+        SELECT rs.id, rs.round_id, rs.user_id, u.username, rs.source_code, rs.language, rs.submitted_at,
+            COALESCE(rs.verdict, ''), rs.passed_tests, rs.total_tests, rs.execution_time_ms,
+            rs.memory_used_kb, COALESCE(rs.compile_output, '')
+        FROM round_submissions rs
+        JOIN users u ON u.id = rs.user_id
+        WHERE rs.round_id = $1
+        ORDER BY rs.submitted_at ASC;
     `, roundID)
 	if err != nil {
 		return nil, err
@@ -229,9 +226,16 @@ func (p *PostgresStore) GetRoundSubmissions(roomID, roundID string) ([]models.Ro
 			&submission.ID,
 			&submission.RoundID,
 			&submission.UserID,
+			&submission.Username,
 			&submission.SourceCode,
 			&submission.Language,
 			&submission.SubmittedAt,
+			&submission.Verdict,
+			&submission.PassedTests,
+			&submission.TotalTests,
+			&submission.ExecutionTimeMS,
+			&submission.MemoryUsedKB,
+			&submission.CompileOutput,
 		); err != nil {
 			return nil, err
 		}
@@ -242,4 +246,19 @@ func (p *PostgresStore) GetRoundSubmissions(roomID, roundID string) ([]models.Ro
 		return nil, err
 	}
 	return submissions, nil
+}
+
+func (p *PostgresStore) UpdateSubmissionResult(submissionID string, verdict string, passedTests int, totalTests int, executionTimeMS int, memoryUsedKB int, compileOutput string) error {
+	_, err := p.Pool.Exec(
+		context.Background(),
+		`UPDATE round_submissions
+		SET verdict = $2,
+			passed_tests = $3,
+			total_tests = $4,
+			execution_time_ms = $5,
+			memory_used_kb = $6,
+			compile_output = $7
+		WHERE id = $1`, submissionID, verdict, passedTests, totalTests, executionTimeMS, memoryUsedKB, compileOutput,
+	)
+	return err
 }

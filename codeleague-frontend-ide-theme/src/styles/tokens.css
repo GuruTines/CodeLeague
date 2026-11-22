@@ -1,0 +1,27 @@
+:root {
+  /* CodeLeague IDE-inspired theme */
+  --bg: #1e1e1e;
+  --bg-raised: #252526;
+  --panel: #252526;
+  --panel-2: #2d2d30;
+  --line: rgba(255, 255, 255, 0.09);
+  --line-strong: rgba(255, 255, 255, 0.16);
+  --text: #d4d4d4;
+  --text-dim: #a0a0a0;
+  --text-faint: #777777;
+  --violet: #3794ff;
+  --blue: #007acc;
+  --cyan: #4fc1ff;
+  --magenta: #c586c0;
+  --ok: #89d185;
+  --warn: #dcdcaa;
+  --bad: #f48771;
+  --grad: linear-gradient(100deg, #007acc 0%, #3794ff 100%);
+  --font: 'Onest Variable', 'Onest', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 8px;
+  --header-h: 48px;
+  color-scheme: dark;
+}

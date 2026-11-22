@@ -3,9 +3,11 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"os"
 	"project/internal/api"
-	"project/internal/database/inmemory"
 	"project/internal/database/postgres"
+	"project/internal/database/redis"
+	"project/internal/judgeclient"
 	"project/internal/middlware"
 	"project/internal/service"
 	"project/internal/websocket"
@@ -13,7 +15,10 @@ import (
 
 func main() {
 	// БАЗЫ ДАННЫХ ПРИЛОЖЕНИЯ
-	strConn := "postgres://postgres:postgres@localhost:5432/code_league"
+	strConn := os.Getenv("DATABASE_URL")
+	if strConn == "" {
+		strConn = "postgres://postgres:postgres@localhost:5432/code_league?sslmode=disable"
+	}
 	postgresStore, err := postgres.NewPostgresPool(strConn)
 	if err != nil {
 		fmt.Println("Возникла ошибка!", err)
@@ -22,36 +27,53 @@ func main() {
 	defer postgresStore.Pool.Close()
 
 	// Инициализация подключения к БД (redis)
-	// configRedis := redis.ConfigRedis{
-	// 	Addr:     "127.0.0.1:6379",
-	// 	Password: "",
-	// 	DB:       0,
-	// }
-	// redisStore, err := redis.NewRedisConnect(configRedis)
-	// if err != nil {
-	// 	fmt.Println("Возникла ошибка!", err)
-	// 	return
-	// }
-	inMemoryStore := inmemory.NewMemory()
+	redisAddr := os.Getenv("REDIS_ADDR")
+	configRedis := redis.ConfigRedis{
+		Addr:     redisAddr,
+		Password: "",
+		DB:       0,
+	}
+	redisStore, err := redis.NewRedisConnect(configRedis)
+	if err != nil {
+		fmt.Println("Возникла ошибка!", err)
+		return
+	}
+	defer redisStore.Conn.Close()
+	// inMemoryStore := inmemory.NewMemory()
+
+	// Инициализация подключения к rust
+	judgeBaseURL := os.Getenv("JUDGE_BASE_URL")
+	if judgeBaseURL == "" {
+		judgeBaseURL = "http://localhost:8081"
+	}
+	judge := judgeclient.NewClient(
+		judgeBaseURL,
+		os.Getenv("JUDGE_API_TOKEN"),
+	)
 
 	// MIDDLWARE
-	authMid := middlware.NewAuthMiddlware(inMemoryStore)
+	authMid := middlware.NewAuthMiddlware(redisStore)
 	accessMid := middlware.NewAccessMiddlware(postgresStore)
 
+	// WEBSOCKET-ХАБ
+	wsHub := websocket.NewHub()
+	go wsHub.Run()
+
 	// БИЗНЕС-ЛОГИКА ПРИЛОЖЕНИЯ
-	authService := service.NewAuthService(postgresStore)       // Авторизация
-	sessionService := service.NewSessionService(inMemoryStore) // Сессии
-	roomService := service.NewRoomService(postgresStore)       // Комнаты
-	roundService := service.NewRoundService(postgresStore)     // Раунды
+	authService := service.NewAuthService(postgresStore)                 // Авторизация
+	sessionService := service.NewSessionService(redisStore)              // Сессии
+	roomService := service.NewRoomService(postgresStore)                 // Комнаты
+	roundService := service.NewRoundService(postgresStore, judge, wsHub) // Раунды
+	taskService := service.NewTaskService(postgresStore)                 // Задачи
 
 	// ТРАНСПОРТНЫЙ СЛОЙ ПРИЛОЖЕНИЯ
 	authAPI := api.NewAuthAPI(authService, sessionService)
 	roomAPI := api.NewRoomAPI(roomService)
 	roundAPI := api.NewRoundAPI(roundService)
+	taskAPI := api.NewTaskAPI(taskService)
 
 	// WEBSOCKET
-	wsHub := websocket.NewHub()
-	go wsHub.Run()
+	wsHub.SetOnOffline(roundService.OnUserOffline)
 	wsHandler := websocket.NewHandler(wsHub, postgresStore)
 
 	// АВТОРИЗАЦИЯ
@@ -66,6 +88,13 @@ func main() {
 	http.Handle("DELETE /rooms/{UUID}/tasks", authMid.AuthMiddlwareWrap(accessMid.AccessMiddlwareWrap(http.HandlerFunc(roomAPI.DelTasksFromRoomHandler))))       // Удаление задач из комнаты
 	http.Handle("PATCH /rooms/{UUID}/tasks/{taskID}", authMid.AuthMiddlwareWrap(accessMid.AccessMiddlwareWrap(http.HandlerFunc(roomAPI.SetTaskSuccessHandler)))) // Обновление статуса is_success задачи внутри комнаты
 	http.Handle("POST /rooms/{UUID}/users", authMid.AuthMiddlwareWrap(http.HandlerFunc(roomAPI.AddUserInRoomHandler)))                                           // Добавление пользователя в комнату
+	http.Handle("GET /rooms", authMid.AuthMiddlwareWrap(http.HandlerFunc(roomAPI.GetAllRoomsHandler)))                                                           // открытые комнаты
+	http.Handle("GET /me/rooms", authMid.AuthMiddlwareWrap(http.HandlerFunc(roomAPI.GetMyRoomsHandler)))                                                         // мои комнаты
+	http.Handle("GET /rooms/{UUID}", authMid.AuthMiddlwareWrap(http.HandlerFunc(roomAPI.GetRoomHandler)))                                                        // данные комнаты (только участникам)
+
+	// ЗАДАЧИ
+	http.Handle("GET /tasks", authMid.AuthMiddlwareWrap(http.HandlerFunc(taskAPI.GetAllTasksHandler))) // Получить список задач
+	http.Handle("GET /tasks/{id}", authMid.AuthMiddlwareWrap(http.HandlerFunc(taskAPI.GetTaskHandler)))
 
 	// РАУНДЫ
 	// Создать раунд — только администратор комнаты
@@ -88,7 +117,3 @@ func main() {
 		return
 	}
 }
-
-// При добавлении/удалении задач не от админа
-// IsAdminInRoom no rows in result set
-// AccessMiddlwareWrap2 no rows in result set

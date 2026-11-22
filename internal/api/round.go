@@ -54,11 +54,7 @@ func (a *RoundAPI) StartRoundHandler(w http.ResponseWriter, r *http.Request) {
 	decoder.DisallowUnknownFields()
 
 	if err := decoder.Decode(&input); err != nil {
-		handler.SendErrResponse(
-			w,
-			"Некорректное тело запроса",
-			http.StatusBadRequest,
-		)
+		handler.SendErrResponse(w, "Некорректное тело запроса", http.StatusBadRequest)
 		return
 	}
 

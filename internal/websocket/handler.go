@@ -4,7 +4,10 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"net/url"
+	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"project/internal/middlware"
@@ -14,6 +17,7 @@ import (
 
 type RoomAccess interface {
 	IsUserInRoom(roomID string, userID int) (bool, error)
+	GetUsername(userID int) (string, error)
 }
 
 type Handler struct {
@@ -28,18 +32,77 @@ func NewHandler(hub *Hub, rooms RoomAccess) *Handler {
 	}
 }
 
+var defaultAllowedOrigins = []string{
+	"http://localhost:5173",
+	"http://127.0.0.1:5173",
+	"http://10.37.201.235:5173",
+	"https://10.37.201.235:5173",
+}
+
+var (
+	allowedOrigins = loadAllowedOrigins()
+	allowAnyOrigin = allowedOrigins["*"]
+)
+
+func loadAllowedOrigins() map[string]bool {
+	result := make(map[string]bool)
+	for _, origin := range defaultAllowedOrigins {
+		result[strings.ToLower(origin)] = true
+	}
+	for _, origin := range strings.Split(os.Getenv("WS_ALLOWED_ORIGINS"), ",") {
+		origin = strings.ToLower(strings.TrimSpace(origin))
+		origin = strings.TrimRight(origin, "/")
+		if origin != "" {
+			result[origin] = true
+		}
+	}
+	return result
+}
+
+// checkOrigin разрешает соединение, если:
+//   - заголовка Origin нет (не браузер — доступ всё равно защищён cookie сессии);
+//   - Origin совпадает с Host запроса (фронтенд и бэкенд на одном адресе — именно так
+//     работает Vite-прокси и nginx), в том числе с X-Forwarded-Host за обратным прокси;
+//   - Origin есть в списке разрешённых.
+//
+// Раньше принимались только четыре жёстко прописанных адреса, поэтому любой, кто открывал
+// сайт по другому адресу (свой IP, имя хоста, другой порт), получал 403 на подключении к чату.
+func checkOrigin(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" || allowAnyOrigin {
+		return true
+	}
+
+	parsed, err := url.Parse(origin)
+	if err != nil || parsed.Host == "" {
+		log.Printf("WS origin rejected (invalid): origin=%q host=%q", origin, r.Host)
+		return false
+	}
+
+	if strings.EqualFold(parsed.Host, r.Host) {
+		return true
+	}
+
+	if forwarded := r.Header.Get("X-Forwarded-Host"); forwarded != "" {
+		first := strings.TrimSpace(strings.Split(forwarded, ",")[0])
+		if strings.EqualFold(parsed.Host, first) {
+			return true
+		}
+	}
+
+	normalized := strings.ToLower(parsed.Scheme + "://" + parsed.Host)
+	if allowedOrigins[normalized] {
+		return true
+	}
+
+	log.Printf("WS origin rejected: origin=%q host=%q (WS_ALLOWED_ORIGINS)", origin, r.Host)
+	return false
+}
+
 var upgrader = gorilla.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
-	CheckOrigin: func(r *http.Request) bool {
-		origin := r.Header.Get("Origin")
-		if origin == "" {
-			return true
-		}
-
-		return origin == "http://"+r.Host ||
-			origin == "https://"+r.Host
-	},
+	CheckOrigin:     checkOrigin,
 }
 
 type IncomingMessage struct {
@@ -48,13 +111,22 @@ type IncomingMessage struct {
 }
 
 type OutgoingMessage struct {
-	Type    string `json:"type"`
-	RoomID  string `json:"room_id"`
-	UserID  string `json:"user_id"`
-	Payload string `json:"payload"`
+	Type     string `json:"type"`
+	RoomID   string `json:"room_id"`
+	UserID   string `json:"user_id"`
+	Username string `json:"username,omitempty"`
+	Payload  string `json:"payload"`
 }
 
 func (h *Handler) ServeWS(w http.ResponseWriter, r *http.Request) {
+	log.Printf(
+		"WS request: method=%s path=%s host=%s origin=%s",
+		r.Method,
+		r.URL.Path,
+		r.Host,
+		r.Header.Get("Origin"),
+	)
+
 	roomID := r.PathValue("UUID")
 
 	userID, ok := r.Context().Value(middlware.UserKeyID).(string)
@@ -86,15 +158,21 @@ func (h *Handler) ServeWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := &Client{
-		RoomID: roomID,
-		UserID: userID,
-		Send:   make(chan []byte, 64),
+	log.Println("WS connected successfully")
+
+	username, err := h.rooms.GetUsername(intUserID)
+	if err != nil {
+		log.Printf("lookup username: %v", err)
 	}
 
-	h.hub.Register(client)
+	client := &Client{
+		RoomID:   roomID,
+		UserID:   userID,
+		Username: username,
+		Send:     make(chan []byte, 64),
+	}
 
-	h.broadcastEvent(roomID, userID, "user_joined", "")
+	h.hub.Connect(client)
 
 	go h.writePump(conn, client)
 	h.readPump(conn, client)
@@ -102,9 +180,8 @@ func (h *Handler) ServeWS(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) readPump(conn *gorilla.Conn, client *Client) {
 	defer func() {
-		h.hub.Unregister(client)
+		h.hub.Disconnect(client)
 		conn.Close()
-		h.broadcastEvent(client.RoomID, client.UserID, "user_left", "")
 	}()
 
 	conn.SetReadLimit(16 * 1024)
@@ -132,12 +209,7 @@ func (h *Handler) readPump(conn *gorilla.Conn, client *Client) {
 			continue
 		}
 
-		h.broadcastEvent(
-			client.RoomID,
-			client.UserID,
-			"chat",
-			incoming.Payload,
-		)
+		h.broadcastEvent(client, "chat", incoming.Payload)
 	}
 }
 
@@ -170,22 +242,18 @@ func (h *Handler) writePump(conn *gorilla.Conn, client *Client) {
 	}
 }
 
-func (h *Handler) broadcastEvent(
-	roomID string,
-	userID string,
-	eventType string,
-	payload string,
-) {
+func (h *Handler) broadcastEvent(client *Client, eventType string, payload string) {
 	data, err := json.Marshal(OutgoingMessage{
-		Type:    eventType,
-		RoomID:  roomID,
-		UserID:  userID,
-		Payload: payload,
+		Type:     eventType,
+		RoomID:   client.RoomID,
+		UserID:   client.UserID,
+		Username: client.Username,
+		Payload:  payload,
 	})
 	if err != nil {
 		log.Printf("marshal websocket event: %v", err)
 		return
 	}
 
-	h.hub.Broadcast(roomID, data)
+	h.hub.Broadcast(client.RoomID, data)
 }

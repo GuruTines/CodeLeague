@@ -16,6 +16,9 @@ type RoomStorage interface {
 	DelTasksFromRoom(roomUUID string, tasksList models.TasksList) error
 	SetTaskSuccessRoom(roomUUID string, taskID int) error
 	AddUserInRoom(roomUUID string, userID int) error
+	GetAllRooms(userID int) ([]models.RoomsList, error)
+	GetRoom(roomUUID string, userID int) (*models.RoomDetails, error)
+	GetMyRooms(userID int) ([]models.RoomsList, error)
 }
 
 type RoomService struct {
@@ -128,4 +131,41 @@ func (rm *RoomService) AddUserInRoom(roomUUID string, userID string) error {
 	}
 
 	return nil
+}
+
+func (rm *RoomService) GetAllRooms(userID string) ([]models.RoomsList, error) {
+	intUserID, err := strconv.Atoi(userID)
+	if err != nil {
+		return nil, errors.New(handler.InternalServerError)
+	}
+
+	rooms, err := rm.db.GetAllRooms(intUserID)
+	if err != nil {
+		return nil, err
+	}
+
+	return rooms, nil
+}
+
+func (rm *RoomService) GetRoom(roomUUID string, userID string) (*models.RoomDetails, error) {
+	intUserID, err := strconv.Atoi(userID)
+	if err != nil {
+		return nil, errors.New(handler.InternalServerError)
+	}
+
+	room, err := rm.db.GetRoom(roomUUID, intUserID)
+	if err != nil {
+		return nil, err
+	}
+
+	return room, nil
+}
+
+func (rm *RoomService) GetMyRooms(userID string) ([]models.RoomsList, error) {
+	intUserID, err := strconv.Atoi(userID)
+	if err != nil {
+		return nil, errors.New(handler.InternalServerError)
+	}
+
+	return rm.db.GetMyRooms(intUserID)
 }

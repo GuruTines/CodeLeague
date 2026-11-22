@@ -58,7 +58,7 @@ func (a *AuthAPI) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 		MaxAge:   3600 * 24 * 7,
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   false,
 	})
 
 	handler.SendJSON(w, userResult, http.StatusCreated)
@@ -98,7 +98,7 @@ func (a *AuthAPI) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 		MaxAge:   3600 * 24 * 7,
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   false,
 	})
 
 	handler.SendJSON(w, userResult, http.StatusOK)

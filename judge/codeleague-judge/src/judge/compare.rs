@@ -1,63 +1,58 @@
-use crate::models::CompareMode;
+//! Comparison of the value returned by the function with the expected one.
 
-/// Returns whether `actual` matches `expected` under `mode`.
-pub fn outputs_match(mode: CompareMode, actual: &[u8], expected: &[u8]) -> bool {
-    match mode {
-        CompareMode::Exact => actual == expected,
-        CompareMode::TrimTrailing => normalized_lines(actual).eq(normalized_lines(expected)),
-        CompareMode::Tokens => tokens(actual).eq(tokens(expected)),
+use serde_json::{Number, Value};
+
+/// Relative/absolute tolerance used when floating-point numbers are involved.
+const EPSILON: f64 = 1e-6;
+
+/// Structural equality of two JSON values. Integers must match exactly; as soon
+/// as one side is a floating-point number both are compared with [`EPSILON`].
+pub fn values_equal(expected: &Value, actual: &Value) -> bool {
+    match (expected, actual) {
+        (Value::Number(a), Value::Number(b)) => numbers_equal(a, b),
+        (Value::Array(a), Value::Array(b)) => a.len() == b.len() && a.iter().zip(b).all(|(x, y)| values_equal(x, y)),
+        _ => expected == actual,
     }
 }
 
-/// Lines with trailing whitespace stripped and trailing blank lines removed.
-fn normalized_lines(data: &[u8]) -> impl Iterator<Item = &[u8]> {
-    let mut lines: Vec<&[u8]> = data.split(|&b| b == b'\n').map(trim_end).collect();
-    while lines.last().is_some_and(|l| l.is_empty()) {
-        lines.pop();
+fn numbers_equal(a: &Number, b: &Number) -> bool {
+    if let (Some(x), Some(y)) = (a.as_i64(), b.as_i64()) {
+        return x == y;
     }
-    lines.into_iter()
-}
-
-fn trim_end(mut line: &[u8]) -> &[u8] {
-    while let Some((&last, rest)) = line.split_last() {
-        if last.is_ascii_whitespace() {
-            line = rest;
-        } else {
-            break;
-        }
+    match (a.as_f64(), b.as_f64()) {
+        (Some(x), Some(y)) => (x - y).abs() <= EPSILON * x.abs().max(y.abs()).max(1.0),
+        _ => false,
     }
-    line
-}
-
-fn tokens(data: &[u8]) -> impl Iterator<Item = &[u8]> {
-    data.split(|b| b.is_ascii_whitespace()).filter(|t| !t.is_empty())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use CompareMode::*;
+    use serde_json::json;
 
     #[test]
-    fn exact_is_strict() {
-        assert!(outputs_match(Exact, b"1 2\n", b"1 2\n"));
-        assert!(!outputs_match(Exact, b"1 2\n", b"1 2"));
-        assert!(!outputs_match(Exact, b"1 2 \n", b"1 2\n"));
+    fn integers_are_exact() {
+        assert!(values_equal(&json!(5), &json!(5)));
+        assert!(!values_equal(&json!(5), &json!(6)));
+        assert!(!values_equal(&json!(9007199254740993_i64), &json!(9007199254740992_i64)));
     }
 
     #[test]
-    fn trim_trailing_ignores_line_end_noise() {
-        assert!(outputs_match(TrimTrailing, b"1 2  \r\n3\r\n\r\n\n", b"1 2\n3"));
-        assert!(outputs_match(TrimTrailing, b"", b"\n\n"));
-        assert!(!outputs_match(TrimTrailing, b"1  2\n", b"1 2\n"));
-        assert!(!outputs_match(TrimTrailing, b"1\n\n2\n", b"1\n2\n"));
-        assert!(!outputs_match(TrimTrailing, b" 1\n", b"1\n"));
+    fn floats_use_a_tolerance() {
+        assert!(values_equal(&json!(0.3), &json!(0.1 + 0.2)));
+        assert!(values_equal(&json!(5), &json!(5.0)));
+        assert!(values_equal(&json!(1e12), &json!(1e12 + 1.0)));
+        assert!(!values_equal(&json!(0.3), &json!(0.31)));
     }
 
     #[test]
-    fn tokens_ignore_all_whitespace_layout() {
-        assert!(outputs_match(Tokens, b"1   2\n\n3", b"1 2 3\n"));
-        assert!(!outputs_match(Tokens, b"1 2", b"1 2 3"));
-        assert!(!outputs_match(Tokens, b"12", b"1 2"));
+    fn arrays_strings_and_bools() {
+        assert!(values_equal(&json!([[1, 2], []]), &json!([[1, 2], []])));
+        assert!(!values_equal(&json!([1, 2]), &json!([2, 1])));
+        assert!(!values_equal(&json!([1, 2]), &json!([1, 2, 3])));
+        assert!(values_equal(&json!("a b"), &json!("a b")));
+        assert!(!values_equal(&json!("a b"), &json!("a  b")));
+        assert!(!values_equal(&json!(true), &json!(1)));
+        assert!(!values_equal(&json!(["1"]), &json!([1])));
     }
 }

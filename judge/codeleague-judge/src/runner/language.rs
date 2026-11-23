@@ -33,6 +33,8 @@ impl Language {
         }
     }
 
+    /// Name of the file that holds the user's code (the harness is added around it,
+    /// see [`crate::function::harness::render`]).
     pub fn source_file(self) -> &'static str {
         match self {
             Language::C => "main.c",
@@ -109,11 +111,11 @@ impl Toolchain {
             }),
             Language::Rust => Some(Command {
                 program: self.rustc.clone()?,
-                args: ["-O", "--edition", "2021", "-o", "main", "main.rs"].map(s).to_vec(),
+                args: ["-O", "--edition", "2021", "-A", "warnings", "-o", "main", "main.rs"].map(s).to_vec(),
             }),
             Language::Go => Some(Command {
                 program: self.go.clone()?,
-                args: ["build", "-o", "main", "main.go"].map(s).to_vec(),
+                args: ["build", "-o", "main", "main.go", "harness.go"].map(s).to_vec(),
             }),
             Language::Python => None,
         }

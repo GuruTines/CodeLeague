@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::runner::language::Language;
+use crate::{function::types::Signature, runner::language::Language};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -15,37 +15,27 @@ pub enum Verdict {
     CompilationError,
 }
 
-/// How the program output is compared with the expected output.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum CompareMode {
-    /// Byte-for-byte equality.
-    Exact,
-    /// Ignores `\r`, trailing whitespace on every line and trailing blank lines.
-    #[default]
-    TrimTrailing,
-    /// Compares whitespace-separated tokens only.
-    Tokens,
-}
-
 #[derive(Debug, Clone, Deserialize)]
 pub struct TestCase {
-    /// Fed to the program's stdin.
+    /// The arguments: a JSON array with one element per parameter of the signature,
+    /// e.g. `[[2, 7, 11, 15], 9]`.
     pub input: String,
+    /// The expected return value as JSON, e.g. `[0, 1]`.
     pub expected_output: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct JudgeRequest {
     pub language: Language,
+    /// The user's code: the function described by `signature` (plus any helpers).
+    /// It must not define an entry point of its own; the judge appends one.
     pub source_code: String,
+    pub signature: Signature,
     pub tests: Vec<TestCase>,
     /// CPU time limit per test, in milliseconds.
     pub time_limit_ms: u64,
     /// Peak resident memory limit per test, in mebibytes.
     pub memory_limit_mb: u64,
-    #[serde(default)]
-    pub compare_mode: CompareMode,
     /// Skip remaining tests after the first non-accepted verdict (default: true).
     #[serde(default = "default_true")]
     pub stop_on_first_failure: bool,

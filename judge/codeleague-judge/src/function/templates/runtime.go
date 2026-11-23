@@ -1,0 +1,122 @@
+package main
+
+import (
+	"encoding/hex"
+	"io"
+	"os"
+	"strconv"
+	"strings"
+)
+
+// ==== CodeLeague harness (generated, do not edit) ====
+
+type clIn struct {
+	toks []string
+	pos  int
+}
+
+func clDie(msg string) {
+	os.Stderr.WriteString(msg + "\n")
+	os.Exit(3)
+}
+
+func clNewIn() *clIn {
+	data, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		clDie("harness: cannot read stdin")
+	}
+	return &clIn{toks: strings.Fields(string(data))}
+}
+
+func (s *clIn) next() string {
+	if s.pos >= len(s.toks) {
+		clDie("harness: unexpected end of input")
+	}
+	s.pos++
+	return s.toks[s.pos-1]
+}
+
+func clReadInt(s *clIn) int {
+	v, err := strconv.Atoi(s.next())
+	if err != nil {
+		clDie("harness: bad int")
+	}
+	return v
+}
+
+func clReadInt64(s *clIn) int64 {
+	v, err := strconv.ParseInt(s.next(), 10, 64)
+	if err != nil {
+		clDie("harness: bad long")
+	}
+	return v
+}
+
+func clReadFloat(s *clIn) float64 {
+	v, err := strconv.ParseFloat(s.next(), 64)
+	if err != nil {
+		clDie("harness: bad double")
+	}
+	return v
+}
+
+func clReadBool(s *clIn) bool { return s.next() == "1" }
+
+func clReadString(s *clIn) string {
+	t := s.next()
+	if t == "-" {
+		return ""
+	}
+	b, err := hex.DecodeString(t)
+	if err != nil {
+		clDie("harness: bad string")
+	}
+	return string(b)
+}
+
+func clReadSlice[T any](s *clIn, elem func(*clIn) T) []T {
+	n := clReadInt(s)
+	out := make([]T, 0, n)
+	for i := 0; i < n; i++ {
+		out = append(out, elem(s))
+	}
+	return out
+}
+
+type clOut struct{ sb strings.Builder }
+
+func (o *clOut) tok(s string) {
+	if o.sb.Len() > 0 {
+		o.sb.WriteByte(' ')
+	}
+	o.sb.WriteString(s)
+}
+
+func clWriteInt(o *clOut, v int)         { o.tok(strconv.Itoa(v)) }
+func clWriteInt64(o *clOut, v int64)     { o.tok(strconv.FormatInt(v, 10)) }
+func clWriteFloat(o *clOut, v float64)   { o.tok(strconv.FormatFloat(v, 'g', -1, 64)) }
+func clWriteBool(o *clOut, v bool) {
+	if v {
+		o.tok("1")
+	} else {
+		o.tok("0")
+	}
+}
+func clWriteString(o *clOut, v string) {
+	if v == "" {
+		o.tok("-")
+	} else {
+		o.tok(hex.EncodeToString([]byte(v)))
+	}
+}
+
+func clWriteSlice[T any](o *clOut, v []T, elem func(*clOut, T)) {
+	o.tok(strconv.Itoa(len(v)))
+	for _, x := range v {
+		elem(o, x)
+	}
+}
+
+func clFinish(o *clOut) {
+	os.Stdout.WriteString("\n@@CL_RESULT@@\n" + o.sb.String() + "\n")
+}

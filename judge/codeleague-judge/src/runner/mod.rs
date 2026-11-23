@@ -1,4 +1,4 @@
-//! Per-submission pipeline: workspace → compile → run every test → verdicts.
+//! Per-submission pipeline: workspace → harness → compile → run every test → verdicts.
 
 pub mod language;
 
@@ -13,7 +13,8 @@ use tokio::sync::Semaphore;
 use crate::{
     config::Config,
     error::{Error, Result},
-    judge::{classify, JudgeLimits},
+    function::{self, codec},
+    judge::{classify, Expected, JudgeLimits},
     models::{JudgeRequest, JudgeResponse, LanguageInfo, TestResult, Verdict},
     sandbox::{self, Isolation, Limits, RunOutcome, RunSpec, Termination},
 };
@@ -21,6 +22,12 @@ use language::{Language, Toolchain};
 
 /// Cap on compiler diagnostics returned to the client.
 const COMPILE_OUTPUT_LIMIT: usize = 16 * 1024;
+
+/// A test converted to what actually runs: the harness stdin and the parsed expectation.
+struct PreparedTest {
+    stdin: Vec<u8>,
+    expected: serde_json::Value,
+}
 
 pub struct Engine {
     cfg: Arc<Config>,
@@ -82,6 +89,7 @@ impl Engine {
         if !self.toolchain.is_available(req.language) {
             return Err(Error::UnsupportedLanguage(req.language.as_str().into()));
         }
+        let prepared = prepare_tests(&req)?;
         let _permit = self
             .permits
             .acquire()
@@ -109,8 +117,12 @@ impl Engine {
         }
         let env = self.toolchain.env(req.language, ws.path(), &go_cache);
 
-        tokio::fs::write(ws.path().join(req.language.source_file()), &req.source_code).await?;
-        chown_opt(&ws.path().join(req.language.source_file()), ids)?;
+        // The user's function plus the generated entry point that feeds it the test arguments.
+        for (name, content) in function::harness::render(req.language, &req.signature, &req.source_code) {
+            let path = ws.path().join(name);
+            tokio::fs::write(&path, content).await?;
+            chown_opt(&path, ids)?;
+        }
 
         let mut response = JudgeResponse {
             verdict: Verdict::Accepted,
@@ -153,7 +165,8 @@ impl Engine {
             memory_bytes: limits.memory_bytes,
         };
 
-        for (index, test) in req.tests.iter().enumerate() {
+        let return_type = req.signature.return_type;
+        for (index, test) in prepared.iter().enumerate() {
             // Fresh cwd per test: nothing a run leaves behind is visible to the next one.
             let cwd = ws.path().join(format!("run-{index}"));
             prepare_dir(&cwd, ids)?;
@@ -162,15 +175,15 @@ impl Engine {
                 args: run_cmd.args.clone(),
                 cwd: cwd.clone(),
                 env: env.clone(),
-                stdin: test.input.clone().into_bytes(),
+                stdin: test.stdin.clone(),
                 limits: limits.clone(),
                 isolation: isolation.clone(),
             })
             .await?;
             let _ = tokio::fs::remove_dir_all(&cwd).await;
 
-            let (verdict, message) =
-                classify(&outcome, judge_limits, test.expected_output.as_bytes(), req.compare_mode);
+            let expected = Expected { ty: return_type, value: &test.expected };
+            let (verdict, message) = classify(&outcome, judge_limits, expected);
             let result = self.test_result(index, verdict, message, &outcome);
             response.time_ms = response.time_ms.max(result.time_ms);
             response.memory_kb = response.memory_kb.max(result.memory_kb);
@@ -240,7 +253,8 @@ impl Engine {
             memory_kb: o.peak_memory_bytes / 1024,
             exit_code: o.exit_code,
             signal: o.signal,
-            stdout: lossy_truncate(&o.stdout, cap),
+            // Only what the solution itself printed; the encoded return value is not shown.
+            stdout: lossy_truncate(function::split_stdout(&o.stdout).0, cap),
             stderr: lossy_truncate(&o.stderr, cap),
             message,
         }
@@ -268,7 +282,23 @@ pub fn validate(req: &JudgeRequest, cfg: &Config) -> Result<()> {
     if !(4..=cfg.max_memory_limit_mb).contains(&req.memory_limit_mb) {
         return bad(format!("memory_limit_mb must be in 4..={}", cfg.max_memory_limit_mb));
     }
+    req.signature.validate().map_err(|m| Error::Validation(format!("signature: {m}")))?;
+    prepare_tests(req)?;
     Ok(())
+}
+
+/// Encodes every test against the signature. Fails with a validation error naming the
+/// offending test, so broken task data is reported instead of producing bogus verdicts.
+fn prepare_tests(req: &JudgeRequest) -> Result<Vec<PreparedTest>> {
+    let mut prepared = Vec::with_capacity(req.tests.len());
+    for (i, test) in req.tests.iter().enumerate() {
+        let stdin = codec::encode_args(&req.signature, &test.input)
+            .map_err(|e| Error::Validation(format!("test {}: input: {e}", i + 1)))?;
+        let expected = codec::parse_expected(req.signature.return_type, &test.expected_output)
+            .map_err(|e| Error::Validation(format!("test {}: expected_output: {e}", i + 1)))?;
+        prepared.push(PreparedTest { stdin: stdin.into_bytes(), expected });
+    }
+    Ok(prepared)
 }
 
 fn compile_message(o: &RunOutcome) -> String {

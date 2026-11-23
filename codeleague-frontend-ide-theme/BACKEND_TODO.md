@@ -41,7 +41,11 @@
 [ { "id": 1, "title": "…", "description": "…" } ]
 
 // GET /tasks/{id}
-{ "id": 1, "title": "…", "description": "…", "samples": [ { "input": "2 3", "expected_output": "5" } ] }
+{ "id": 1, "title": "…", "description": "…",
+  "signature": { "name": "solve", "params": [ { "name": "a", "type": "int" }, { "name": "b", "type": "int" } ], "return_type": "int" },
+  "samples": [ { "input": "[2, 3]", "expected_output": "5" } ] }
+// Решение — функция (как на LeetCode): input — JSON-массив аргументов, expected_output — JSON-значение.
+// Активный раунд (POST/GET /rooms/{id}/rounds…) тоже несёт "task_signature": по нему фронтенд строит стартовый код.
 ```
 
 ### 1.1. Модели (`internal/models`)
@@ -88,7 +92,8 @@ type TaskSample struct {
 
 type TaskDetails struct {
 	Task
-	Samples []TaskSample `json:"samples"`
+	Signature *TaskSignature `json:"signature,omitempty"` // см. internal/models/tasks.go
+	Samples   []TaskSample   `json:"samples"`
 }
 ```
 

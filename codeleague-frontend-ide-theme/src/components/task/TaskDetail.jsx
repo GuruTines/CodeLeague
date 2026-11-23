@@ -3,9 +3,22 @@ import { Cpu, Timer } from 'lucide-react';
 import RichText from '../ui/RichText';
 import { Badge, CopyButton } from '../ui';
 import { LIMITS } from '../../lib/languages';
+import { describeSignature, formatSampleInput } from '../../lib/starter';
 import { useTaskDetails } from '../../hooks/useTaskDetails';
 
-export function Samples({ samples }) {
+// Задача — функция: показываем её сигнатуру. Данные приходят аргументами, ответ уходит через return.
+export function SignatureBlock({ signature }) {
+  if (!signature?.name) return null;
+  return (
+    <section className="task-signature">
+      <h3>Функция</h3>
+      <code>{describeSignature(signature)}</code>
+      <p className="muted small">Читать ввод и печатать результат не нужно: аргументы приходят параметрами, ответ верните через return.</p>
+    </section>
+  );
+}
+
+export function Samples({ samples, signature }) {
   if (!samples?.length) return null;
   return (
     <section className="samples">
@@ -14,7 +27,7 @@ export function Samples({ samples }) {
         <div className="sample" key={i}>
           <div>
             <div className="sample-head"><span>Ввод</span><CopyButton text={s.input} /></div>
-            <pre>{s.input}</pre>
+            <pre>{formatSampleInput(signature, s.input)}</pre>
           </div>
           <div>
             <div className="sample-head"><span>Вывод</span><CopyButton text={s.expected_output} /></div>
@@ -46,7 +59,8 @@ export default function TaskDetail({ task, compact = false, actions = null }) {
         {actions ? <div className="task-detail-actions">{actions}</div> : null}
       </header>
       <RichText text={full.description} />
-      <Samples samples={full.samples} />
+      <SignatureBlock signature={full.signature} />
+      <Samples samples={full.samples} signature={full.signature} />
     </article>
   );
 }

@@ -22,10 +22,17 @@ CREATE TABLE users_rooms (
     PRIMARY KEY (user_id, room_id)
 );
 
+-- Задача — это функция, как на LeetCode. signature описывает её, а тесты хранят
+-- аргументы и ответ в JSON (см. task_tests ниже):
+--   {"name": "solve",
+--    "params": [{"name": "nums", "type": "int[]"}, {"name": "target", "type": "int"}],
+--    "return_type": "int[]"}
+-- Типы: int, long, double, bool, string, а также T[] и T[][].
 CREATE TABLE tasks (
     id SERIAL PRIMARY KEY,
     title VARCHAR(128) NOT NULL,
-    description TEXT NOT NULL
+    description TEXT NOT NULL,
+    signature JSONB
 );
 
 CREATE TABLE users_tasks (
@@ -64,7 +71,9 @@ CREATE TABLE task_tests (
     task_id INTEGER NOT NULL
         REFERENCES tasks(id) ON DELETE CASCADE,
 
+    -- JSON-массив аргументов по порядку параметров, например: [[2, 7, 11, 15], 9]
     input TEXT NOT NULL,
+    -- JSON возвращаемого значения, например: [0, 1]
     expected_output TEXT NOT NULL,
 
     is_sample BOOLEAN NOT NULL DEFAULT false,

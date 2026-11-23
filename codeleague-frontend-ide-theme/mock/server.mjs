@@ -19,12 +19,14 @@ const rounds = [];
 const submissions = [];
 const sockets = new Map();   // roomId -> Set<{ws,userId}>
 
+// Задача — функция (как на LeetCode): signature описывает её, а в samples input — JSON-массив аргументов,
+// expected_output — JSON возвращаемого значения.
 const tasks = [
-  { id: 1, title: 'Сумма двух чисел', description: 'Даны два целых числа a и b. Выведите их сумму.\n\nВходные данные\nВ одной строке два целых числа.\n\nВыходные данные\nОдно число — a + b.', samples: [{ input: '2 3', expected_output: '5' }] },
-  { id: 2, title: 'FizzBuzz', description: 'Выведите числа от 1 до n. Вместо кратных 3 — Fizz, кратных 5 — Buzz, обоим — FizzBuzz.', samples: [{ input: '5', expected_output: '1\n2\nFizz\n4\nBuzz' }] },
-  { id: 3, title: 'Палиндром', description: 'Определите, является ли строка палиндромом. Регистр и пробелы не учитываются. Выведите YES или NO.', samples: [{ input: 'А роза упала на лапу Азора', expected_output: 'YES' }] },
-  { id: 4, title: 'Два числа с заданной суммой', description: 'Дан массив и число target. Найдите индексы i < j, для которых a[i] + a[j] = target.', samples: [{ input: '4 9\n2 7 11 15', expected_output: '0 1' }] },
-  { id: 5, title: 'Скобочная последовательность', description: 'Проверьте, правильно ли расставлены скобки ()[]{} в строке. Выведите YES или NO.', samples: [{ input: '([]{})', expected_output: 'YES' }] }
+  { id: 1, title: 'Сумма двух чисел', description: 'Даны два целых числа a и b. Верните их сумму.', signature: { name: 'solve', params: [{ name: 'a', type: 'int' }, { name: 'b', type: 'int' }], return_type: 'int' }, samples: [{ input: '[2, 3]', expected_output: '5' }] },
+  { id: 2, title: 'FizzBuzz', description: 'Верните массив строк для чисел от 1 до n. Вместо кратных 3 — Fizz, кратных 5 — Buzz, обоим — FizzBuzz.', signature: { name: 'fizz_buzz', params: [{ name: 'n', type: 'int' }], return_type: 'string[]' }, samples: [{ input: '[5]', expected_output: '["1", "2", "Fizz", "4", "Buzz"]' }] },
+  { id: 3, title: 'Палиндром', description: 'Определите, является ли строка палиндромом. Регистр и пробелы не учитываются.', signature: { name: 'is_palindrome', params: [{ name: 's', type: 'string' }], return_type: 'bool' }, samples: [{ input: '["А роза упала на лапу Азора"]', expected_output: 'true' }] },
+  { id: 4, title: 'Два числа с заданной суммой', description: 'Дан массив nums и число target. Верните индексы i < j, для которых nums[i] + nums[j] = target.', signature: { name: 'two_sum', params: [{ name: 'nums', type: 'int[]' }, { name: 'target', type: 'int' }], return_type: 'int[]' }, samples: [{ input: '[[2, 7, 11, 15], 9]', expected_output: '[0, 1]' }] },
+  { id: 5, title: 'Скобочная последовательность', description: 'Проверьте, правильно ли расставлены скобки ()[]{} в строке.', signature: { name: 'is_valid', params: [{ name: 's', type: 'string' }], return_type: 'bool' }, samples: [{ input: '["([]{})"]', expected_output: 'true' }] }
 ];
 
 const send = (res, status, data) => { res.writeHead(status); res.end(data === null || data === undefined ? '' : JSON.stringify(data)); };
@@ -135,7 +137,7 @@ route('POST', '/rooms/{UUID}/rounds', { admin: true }, async (req, res, { params
   if (!roomTasks.get(params.UUID).some((x) => x.task_id === task_id)) return err(res, 404, 'задача не добавлена в комнату');
   if (activeRound(params.UUID)) return err(res, 409, 'в комнате уже идёт раунд');
   const t = tasks.find((x) => x.id === task_id);
-  const r = { id: crypto.randomUUID(), room_id: params.UUID, task_id, task_title: t.title, task_description: t.description, round_status: 'active', duration_seconds, started_at: new Date().toISOString() };
+  const r = { id: crypto.randomUUID(), room_id: params.UUID, task_id, task_title: t.title, task_description: t.description, task_signature: t.signature, round_status: 'active', duration_seconds, started_at: new Date().toISOString() };
   rounds.push(r); send(res, 201, r);
 });
 route('GET', '/rooms/{UUID}/rounds/active', {}, async (req, res, { user, params }) => {

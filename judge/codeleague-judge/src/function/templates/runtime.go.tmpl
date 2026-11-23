@@ -8,8 +8,6 @@ import (
 	"strings"
 )
 
-// ==== CodeLeague harness (generated, do not edit) ====
-
 type clIn struct {
 	toks []string
 	pos  int
@@ -92,9 +90,9 @@ func (o *clOut) tok(s string) {
 	o.sb.WriteString(s)
 }
 
-func clWriteInt(o *clOut, v int)         { o.tok(strconv.Itoa(v)) }
-func clWriteInt64(o *clOut, v int64)     { o.tok(strconv.FormatInt(v, 10)) }
-func clWriteFloat(o *clOut, v float64)   { o.tok(strconv.FormatFloat(v, 'g', -1, 64)) }
+func clWriteInt(o *clOut, v int)       { o.tok(strconv.Itoa(v)) }
+func clWriteInt64(o *clOut, v int64)   { o.tok(strconv.FormatInt(v, 10)) }
+func clWriteFloat(o *clOut, v float64) { o.tok(strconv.FormatFloat(v, 'g', -1, 64)) }
 func clWriteBool(o *clOut, v bool) {
 	if v {
 		o.tok("1")

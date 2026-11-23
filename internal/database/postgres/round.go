@@ -22,18 +22,20 @@ func (p *PostgresStore) CreateRound(roomID string, taskID, durationSeconds int) 
     FROM rooms_tasks rt
     WHERE rt.room_id = $2 AND rt.task_id = $3
     RETURNING id, room_id, task_id, round_status, duration_seconds, started_at, ended_at)
-	SELECT i.id, i.room_id, i.task_id, t.title, t.description,
+	SELECT i.id, i.room_id, i.task_id, t.title, t.description, t.signature,
 		i.round_status, i.duration_seconds, i.started_at, i.ended_at
 	FROM inserted i
 	JOIN tasks t ON t.id = i.task_id;`
 
 	var round models.Round
+	var rawSignature []byte
 	err := p.Pool.QueryRow(ctx, query, roundID, roomID, taskID, durationSeconds).Scan(
 		&round.ID,
 		&round.RoomID,
 		&round.TaskID,
 		&round.TaskTitle,
 		&round.TaskDescription,
+		&rawSignature,
 		&round.RoundStatus,
 		&round.DurationSeconds,
 		&round.StartedAt,
@@ -49,6 +51,9 @@ func (p *PostgresStore) CreateRound(roomID string, taskID, durationSeconds int) 
 		}
 		return nil, err
 	}
+	if round.TaskSignature, err = decodeSignature(rawSignature); err != nil {
+		return nil, err
+	}
 	return &round, nil
 }
 
@@ -60,20 +65,24 @@ func (p *PostgresStore) GetActiveRound(roomID string) (*models.Round, error) {
 	if err != nil {
 		return nil, err
 	}
-	query := `SELECT r.id, r.room_id, r.task_id, t.title, t.description, r.round_status,
+	query := `SELECT r.id, r.room_id, r.task_id, t.title, t.description, t.signature, r.round_status,
 		r.duration_seconds, r.started_at, r.ended_at
 		FROM rounds r JOIN tasks t ON t.id = r.task_id
 		WHERE r.room_id = $1 AND r.round_status = 'active' LIMIT 1;`
 	var round models.Round
+	var rawSignature []byte
 	err = p.Pool.QueryRow(ctx, query, roomID).Scan(
 		&round.ID, &round.RoomID, &round.TaskID, &round.TaskTitle,
-		&round.TaskDescription, &round.RoundStatus, &round.DurationSeconds,
+		&round.TaskDescription, &rawSignature, &round.RoundStatus, &round.DurationSeconds,
 		&round.StartedAt, &round.EndedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
+		return nil, err
+	}
+	if round.TaskSignature, err = decodeSignature(rawSignature); err != nil {
 		return nil, err
 	}
 	return &round, nil

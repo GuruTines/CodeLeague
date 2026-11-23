@@ -3,15 +3,16 @@ package models
 import "time"
 
 type Round struct {
-	ID              string     `json:"id"`
-	RoomID          string     `json:"room_id"`
-	TaskID          int        `json:"task_id"`
-	TaskTitle       string     `json:"task_title"`
-	TaskDescription string     `json:"task_description"`
-	RoundStatus     string     `json:"round_status"`
-	DurationSeconds int        `json:"duration_seconds"`
-	StartedAt       time.Time  `json:"started_at"`
-	EndedAt         *time.Time `json:"ended_at,omitempty"`
+	ID              string         `json:"id"`
+	RoomID          string         `json:"room_id"`
+	TaskID          int            `json:"task_id"`
+	TaskTitle       string         `json:"task_title"`
+	TaskDescription string         `json:"task_description"`
+	TaskSignature   *TaskSignature `json:"task_signature,omitempty"`
+	RoundStatus     string         `json:"round_status"`
+	DurationSeconds int            `json:"duration_seconds"`
+	StartedAt       time.Time      `json:"started_at"`
+	EndedAt         *time.Time     `json:"ended_at,omitempty"`
 }
 
 type StartRoundInput struct {

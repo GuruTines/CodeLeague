@@ -112,6 +112,19 @@ func (s *RoundService) SubmitRound(roomID string, roundID string, userID string,
 		return nil, handler.ErrRoundInactive
 	}
 
+	// Решение можно сдать один раз, поэтому задачу без сигнатуры отклоняем до его сохранения.
+	if round.TaskSignature == nil {
+		return nil, errors.New("у задачи не задана сигнатура функции (tasks.signature)")
+	}
+	signature := judgeclient.Signature{
+		Name:       round.TaskSignature.Name,
+		Params:     make([]judgeclient.Param, 0, len(round.TaskSignature.Params)),
+		ReturnType: round.TaskSignature.ReturnType,
+	}
+	for _, p := range round.TaskSignature.Params {
+		signature.Params = append(signature.Params, judgeclient.Param{Name: p.Name, Type: p.Type})
+	}
+
 	submission, err := s.db.SubmitRound(
 		roomID,
 		roundID,
@@ -140,10 +153,10 @@ func (s *RoundService) SubmitRound(roomID string, roundID string, userID string,
 	result, err := s.judge.Judge(context.Background(), judgeclient.Request{
 		Language:           input.Language,
 		SourceCode:         input.SourceCode,
+		Signature:          signature,
 		Tests:              tests,
 		TimeLimitMS:        2000,
 		MemoryLimitMB:      256,
-		CompareMode:        "tokens",
 		StopOnFirstFailure: false,
 	})
 	if err != nil {

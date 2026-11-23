@@ -6,75 +6,22 @@ import cLogo from '../assets/lang/c.svg';
 
 // Список ТОЧНО совпадает с enum Language в judge (c, cpp, python, rust, go).
 // Любое другое значение Judge отклонит.
+// Стартовый код зависит от задачи (сигнатуры), см. lib/starter.js.
 export const LANGUAGES = [
   {
-    value: 'go', label: 'Go', logo: goLogo,
-    starter: `package main
-
-import (
-	"bufio"
-	"fmt"
-	"os"
-)
-
-func main() {
-	in := bufio.NewReader(os.Stdin)
-	var a, b int
-	fmt.Fscan(in, &a, &b)
-	fmt.Println(a + b)
-}
-`
+    value: 'go', label: 'Go', logo: goLogo
   },
   {
-    value: 'python', label: 'Python', logo: pythonLogo,
-    starter: `import sys
-
-def main():
-    data = sys.stdin.read().split()
-    a, b = int(data[0]), int(data[1])
-    print(a + b)
-
-main()
-`
+    value: 'python', label: 'Python', logo: pythonLogo
   },
   {
-    value: 'rust', label: 'Rust', logo: rustLogo, monoOnly: true,
-    starter: `use std::io::{self, Read};
-
-fn main() {
-    let mut input = String::new();
-    io::stdin().read_to_string(&mut input).unwrap();
-    let nums: Vec<i64> = input.split_whitespace().map(|x| x.parse().unwrap()).collect();
-    println!("{}", nums[0] + nums[1]);
-}
-`
+    value: 'rust', label: 'Rust', logo: rustLogo, monoOnly: true
   },
   {
-    value: 'cpp', label: 'C++', logo: cppLogo,
-    starter: `#include <iostream>
-using namespace std;
-
-int main() {
-    ios::sync_with_stdio(false);
-    cin.tie(nullptr);
-    long long a, b;
-    cin >> a >> b;
-    cout << a + b << "\\n";
-    return 0;
-}
-`
+    value: 'cpp', label: 'C++', logo: cppLogo
   },
   {
-    value: 'c', label: 'C', logo: cLogo,
-    starter: `#include <stdio.h>
-
-int main(void) {
-    long long a, b;
-    scanf("%lld %lld", &a, &b);
-    printf("%lld\\n", a + b);
-    return 0;
-}
-`
+    value: 'c', label: 'C', logo: cLogo
   }
 ];
 

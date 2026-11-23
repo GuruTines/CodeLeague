@@ -6,6 +6,7 @@ import TaskDetail from '../../components/task/TaskDetail';
 import ConfirmModal from '../../components/ui/ConfirmModal';
 import { Badge, Button, EmptyState, CopyButton } from '../../components/ui';
 import { LANGUAGES, VERDICTS, getLanguage } from '../../lib/languages';
+import { buildStarter } from '../../lib/starter';
 import { formatClock, plural } from '../../lib/format';
 import { useCountdown } from '../../hooks/useCountdown';
 import { getDraft, setDraft } from '../../store/localState';
@@ -35,11 +36,14 @@ export default function SolvePanel({ roomId, user, round, mySubmission, submitte
   const [error, setError] = useState('');
   const lang = getLanguage(language);
   const draftKey = `${round.id}:${language}`;
+  // Решение — функция: шаблон строится из сигнатуры задачи (приходит вместе с раундом).
+  const signature = round.task_signature;
+  const starter = useMemo(() => buildStarter(language, signature), [language, signature]);
 
   useEffect(() => {
-    setCode(getDraft(user.id, draftKey) ?? lang.starter);
+    setCode(getDraft(user.id, draftKey) ?? starter);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draftKey]);
+  }, [draftKey, starter]);
 
   const changeCode = (value) => { setCode(value); setDraft(user.id, draftKey, value); };
   const changeLanguage = (value) => { setLanguage(value); setDraft(user.id, 'lang', value); };
@@ -113,7 +117,7 @@ export default function SolvePanel({ roomId, user, round, mySubmission, submitte
       </div>
       <div className="solve-split">
         <div className="solve-statement">
-          <TaskDetail compact task={{ id: round.task_id, title: round.task_title, description: round.task_description }} />
+          <TaskDetail compact task={{ id: round.task_id, title: round.task_title, description: round.task_description, signature }} />
         </div>
         <div className="solve-editor">
           <div className="editor-bar">
@@ -131,10 +135,11 @@ export default function SolvePanel({ roomId, user, round, mySubmission, submitte
             <CopyButton text={code} label="Копировать" />
           </div>
           <CodeEditor value={code} onChange={changeCode} language={language} />
+          {!signature ? <p className="form-error" role="alert">У задачи не задана сигнатура функции, поэтому решение нельзя проверить. Сообщите администратору.</p> : null}
           {error ? <p className="form-error" role="alert">{error}</p> : null}
           <div className="editor-foot">
             <p>Черновик сохраняется в браузере. После отправки изменить решение нельзя.</p>
-            <Button variant="accent" icon={Send} onClick={() => setConfirm(true)} disabled={!code.trim()}>Завершить решение</Button>
+            <Button variant="accent" icon={Send} onClick={() => setConfirm(true)} disabled={!code.trim() || !signature}>Завершить решение</Button>
           </div>
         </div>
       </div>

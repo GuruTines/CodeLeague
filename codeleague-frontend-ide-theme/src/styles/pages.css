@@ -16,6 +16,10 @@
 .task-detail.compact .task-detail-head h2 { display: none; }
 .task-detail.compact { gap: 16px; }
 .task-meta { display: flex; flex-wrap: wrap; gap: 6px; }
+.task-signature { display: grid; gap: 8px; margin: 16px 0; }
+.task-signature h3 { font-size: 17px; }
+.task-signature code { display: block; padding: 10px 14px; border-radius: 10px; background: #0a0c1b; border: 1px solid var(--line); font-family: var(--mono); font-size: 13px; overflow-x: auto; }
+.task-signature p { margin: 0; }
 .samples { display: grid; gap: 14px; }
 .samples h3 { font-size: 17px; }
 .sample { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }

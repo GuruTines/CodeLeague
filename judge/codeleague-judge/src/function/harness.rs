@@ -1,7 +1,7 @@
 //! Generates the program that surrounds the user's function.
 //!
 //! The static part of every harness (token reader/writer) lives in
-//! `templates/runtime.*`; only the entry point, which depends on the signature,
+//! `templates/runtime.*` (the Go one is `runtime.go.tmpl`, so that `go build ./...` does not treat it as code); only the entry point, which depends on the signature,
 //! is generated here. For single-file languages the harness is appended *after*
 //! the user's code, so line numbers in compiler messages stay valid. Go gets a
 //! second file next to the user's `main.go`.
@@ -17,7 +17,7 @@ use crate::runner::language::Language;
 const C_RUNTIME: &str = include_str!("templates/runtime.c");
 const CPP_RUNTIME: &str = include_str!("templates/runtime.cpp");
 const RUST_RUNTIME: &str = include_str!("templates/runtime.rs");
-const GO_RUNTIME: &str = include_str!("templates/runtime.go");
+const GO_RUNTIME: &str = include_str!("templates/runtime.go.tmpl");
 const PY_RUNTIME: &str = include_str!("templates/runtime.py");
 
 /// Source files (name, content) to place in the workspace for `lang`.

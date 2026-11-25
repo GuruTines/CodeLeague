@@ -34,7 +34,9 @@ export const VERDICTS = {
   TIME_LIMIT_EXCEEDED: { label: 'Превышено время', tone: 'warn' },
   MEMORY_LIMIT_EXCEEDED: { label: 'Превышена память', tone: 'warn' },
   RUNTIME_ERROR: { label: 'Ошибка выполнения', tone: 'bad' },
-  COMPILATION_ERROR: { label: 'Ошибка компиляции', tone: 'bad' }
+  COMPILATION_ERROR: { label: 'Ошибка компиляции', tone: 'bad' },
+  // Не вердикт Judge: бэкенд ставит его сам, если проверить решение не удалось
+  JUDGE_ERROR: { label: 'Ошибка проверки', tone: 'warn' }
 };
 
 // Ограничения, зашитые в бэкенде (service/round.go) и в БД

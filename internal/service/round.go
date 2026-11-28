@@ -165,8 +165,18 @@ func (s *RoundService) SubmitRound(roomID string, roundID string, userID string,
 
 	result, err := s.judge.Judge(context.Background(), judgeReq)
 	if err != nil {
-		fmt.Println(judgeReq)
-		return submission, err
+		// Решение уже сохранено, а попытка одна: без вердикта участник увидел бы пустоту.
+		// Подробности — в лог, участнику — понятный вердикт «ошибка проверки».
+		log.Printf("Judge не проверил решение %s (задача %d): %v", submission.ID, round.TaskID, err)
+		submission.Verdict = "JUDGE_ERROR"
+		submission.TotalTests = len(tests)
+		submission.CompileOutput = "Сервис проверки не смог обработать решение. Сообщите администратору."
+		if updErr := s.db.UpdateSubmissionResult(
+			submission.ID, submission.Verdict, 0, submission.TotalTests, 0, 0, submission.CompileOutput,
+		); updErr != nil {
+			log.Printf("Не удалось сохранить вердикт JUDGE_ERROR для %s: %v", submission.ID, updErr)
+		}
+		return submission, nil
 	}
 
 	err = s.db.UpdateSubmissionResult(

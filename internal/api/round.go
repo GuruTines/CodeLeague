@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 
 	"project/internal/handler"
@@ -119,6 +120,8 @@ func (a *RoundAPI) SubmitRoundHandler(w http.ResponseWriter, r *http.Request) {
 		)
 		return
 	}
+
+	fmt.Println(input.Language)
 
 	userID, ok := r.Context().Value(middlware.UserKeyID).(string)
 	if !ok {

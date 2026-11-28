@@ -17,7 +17,7 @@ use crate::runner::language::Language;
 const C_RUNTIME: &str = include_str!("templates/runtime.c");
 const CPP_RUNTIME: &str = include_str!("templates/runtime.cpp");
 const RUST_RUNTIME: &str = include_str!("templates/runtime.rs");
-const GO_RUNTIME: &str = include_str!("templates/runtime.go");
+const GO_RUNTIME: &str = include_str!("templates/runtime.go.tmpl");
 const PY_RUNTIME: &str = include_str!("templates/runtime.py");
 
 /// Source files (name, content) to place in the workspace for `lang`.

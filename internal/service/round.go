@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"strconv"
 	"strings"
@@ -132,6 +133,7 @@ func (s *RoundService) SubmitRound(roomID string, roundID string, userID string,
 		input,
 	)
 	if err != nil {
+		fmt.Println("Ошибка в SubmitRound", err)
 		return nil, err
 	}
 
@@ -139,6 +141,7 @@ func (s *RoundService) SubmitRound(roomID string, roundID string, userID string,
 
 	taskTests, err := s.db.GetTaskTests(round.TaskID)
 	if err != nil {
+		fmt.Println("Ошибка в GetTaskTests", err)
 		return submission, err
 	}
 
@@ -150,7 +153,7 @@ func (s *RoundService) SubmitRound(roomID string, roundID string, userID string,
 		})
 	}
 
-	result, err := s.judge.Judge(context.Background(), judgeclient.Request{
+	judgeReq := judgeclient.Request{
 		Language:           input.Language,
 		SourceCode:         input.SourceCode,
 		Signature:          signature,
@@ -158,8 +161,11 @@ func (s *RoundService) SubmitRound(roomID string, roundID string, userID string,
 		TimeLimitMS:        2000,
 		MemoryLimitMB:      256,
 		StopOnFirstFailure: false,
-	})
+	}
+
+	result, err := s.judge.Judge(context.Background(), judgeReq)
 	if err != nil {
+		fmt.Println(judgeReq)
 		return submission, err
 	}
 
@@ -173,6 +179,7 @@ func (s *RoundService) SubmitRound(roomID string, roundID string, userID string,
 		result.CompileOutput,
 	)
 	if err != nil {
+		fmt.Println("Ошибка в UpdateSubmissionResult", err)
 		return submission, err
 	}
 

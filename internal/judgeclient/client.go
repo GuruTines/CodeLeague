@@ -16,22 +16,17 @@ type TestCase struct {
 	ExpectedOutput string `json:"expected_output"`
 }
 
-// Param — параметр функции; Type: int | long | double | bool | string (+ [] или [][]).
 type Param struct {
 	Name string `json:"name"`
 	Type string `json:"type"`
 }
 
-// Signature описывает функцию, которую пишет участник. Судья сам оборачивает код
-// участника в точку входа, поэтому входные данные идут аргументами, а ответ — через return.
 type Signature struct {
 	Name       string  `json:"name"`
 	Params     []Param `json:"params"`
 	ReturnType string  `json:"return_type"`
 }
 
-// Request: TestCase.Input — JSON-массив аргументов (например "[[2, 7, 11, 15], 9]"),
-// TestCase.ExpectedOutput — JSON возвращаемого значения (например "[0, 1]").
 type Request struct {
 	Language           string     `json:"language"`
 	SourceCode         string     `json:"source_code"`

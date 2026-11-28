@@ -99,19 +99,15 @@ func main() {
 	// РАУНДЫ
 	// Создать раунд — только администратор комнаты
 	http.Handle("POST /rooms/{UUID}/rounds", authMid.AuthMiddlwareWrap(accessMid.AccessMiddlwareWrap(http.HandlerFunc(roundAPI.StartRoundHandler))))
-
 	// Получить активный раунд — участник комнаты
 	http.Handle("GET /rooms/{UUID}/rounds/active", authMid.AuthMiddlwareWrap(http.HandlerFunc(roundAPI.GetActiveRoundHandler)))
-
 	// Отправить решение — участник комнаты
 	http.Handle("POST /rooms/{UUID}/rounds/{roundID}/submissions", authMid.AuthMiddlwareWrap(http.HandlerFunc(roundAPI.SubmitRoundHandler)))
-
 	// Получить решения участников раунда
 	http.Handle("GET /rooms/{UUID}/rounds/{roundID}/submissions", authMid.AuthMiddlwareWrap(http.HandlerFunc(roundAPI.GetRoundSubmissionsHandler)))
 
 	// WEBSOCKET КОМНАТЫ
 	http.Handle("GET /rooms/{UUID}/ws", authMid.AuthMiddlwareWrap(http.HandlerFunc(wsHandler.ServeWS)))
-
 	if err := http.ListenAndServe(":9091", nil); err != nil {
 		fmt.Println("Возникла ошибка!", err)
 		return
